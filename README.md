@@ -1,4 +1,13 @@
 LA64是基于RISCV_DV开发的LA64架构随机代码生成器
+使用方法：
+'''bash
+pip3 install -r requirements.txt  # 最好在python虚拟环境中
+python3 run.py
+'''
+查看帮助：
+'''bash
+python3 run.py --help
+'''
 
 原README：
 ## Overview
@@ -59,7 +68,7 @@ pip3 install --user -e .
 This installs riscv-dv in a mode where any changes within the repo are immediately
 available simply by running `run`/`cov`. There is no need to repeatedly run `pip install .`
 after each change. Example for running:
-
+pip3 install -r requirements.txt 
 ```bash
 run --help
 cov --help
