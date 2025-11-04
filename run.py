@@ -785,7 +785,7 @@ def parse_args(cwd):
     # Parse input arguments
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("--target", type=str, default="rv32imc",
+    parser.add_argument("--target", type=str, default="LA64",
                         help="Run the generator with pre-defined targets: \
                             rv32imc, rv32i, rv32imafdc, rv64imc, rv64gc, \
                             rv64imafdc")
@@ -952,6 +952,9 @@ def load_config(args, cwd):
         if args.target == "rv32imc":
             args.mabi = "ilp32"
             args.isa = "rv32imc_zicsr_zifencei"
+        elif args.target == "LA64":
+            args.mabi = "lp64"
+            args.isa = "la64"
         elif args.target == "rv32imafdc":
             args.mabi = "ilp32"
             args.isa = "rv32imafdc_zicsr_zifencei"
@@ -1152,24 +1155,24 @@ def main():
             # Run remaining tests using the instruction generator
             gen(matched_list, args, output_dir, cwd)
 
-        if not args.co:
+        # if not args.co:
             # Compile the assembly program to ELF, convert to plain binary
-            if args.steps == "all" or re.match(".*gcc_compile.*", args.steps):
-                gcc_compile(matched_list, output_dir, args.isa, args.mabi,
-                            args.gcc_opts, args.debug)
+            # if args.steps == "all" or re.match(".*gcc_compile.*", args.steps):
+            #     gcc_compile(matched_list, output_dir, args.isa, args.mabi,
+            #                 args.gcc_opts, args.debug)
 
             # Run ISS simulation
-            if args.steps == "all" or re.match(".*iss_sim.*", args.steps):
-                iss_sim(matched_list, output_dir, args.iss, args.iss_yaml,
-                        args.iss_opts,
-                        args.isa, args.priv, args.core_setting_dir, args.iss_timeout,
-                        args.debug)
+            # if args.steps == "all" or re.match(".*iss_sim.*", args.steps):
+            #     iss_sim(matched_list, output_dir, args.iss, args.iss_yaml,
+            #             args.iss_opts,
+            #             args.isa, args.priv, args.core_setting_dir, args.iss_timeout,
+            #             args.debug)
 
-            # Compare ISS simulation result
-            if args.steps == "all" or re.match(".*iss_cmp.*", args.steps):
-                iss_cmp(matched_list, args.iss, output_dir,
-                        args.stop_on_first_error,
-                        args.exp, args.debug)
+            # # Compare ISS simulation result
+            # if args.steps == "all" or re.match(".*iss_cmp.*", args.steps):
+            #     iss_cmp(matched_list, args.iss, output_dir,
+            #             args.stop_on_first_error,
+            #             args.exp, args.debug)
 
         sys.exit(RET_SUCCESS)
     except KeyboardInterrupt:

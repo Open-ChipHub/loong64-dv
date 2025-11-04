@@ -19,5 +19,7 @@
 // SOURCES
 ${RISCV_DV_ROOT}/src/riscv_signature_pkg.sv
 ${RISCV_DV_ROOT}/src/riscv_instr_pkg.sv
+// UVM各phase
 ${RISCV_DV_ROOT}/test/riscv_instr_test_pkg.sv
+// run_test()入口
 ${RISCV_DV_ROOT}/test/riscv_instr_gen_tb_top.sv

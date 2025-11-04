@@ -22,7 +22,7 @@ class riscv_rand_instr_test extends riscv_instr_base_test;
 
   virtual function void randomize_cfg();
     cfg.instr_cnt = 10000;
-    cfg.num_of_sub_program = 5;
+    cfg.num_of_sub_program = 0;
     `DV_CHECK_RANDOMIZE_FATAL(cfg)
     `uvm_info(`gfn, $sformatf("riscv_instr_gen_config is randomized:\n%0s",
                     cfg.sprint()), UVM_LOW)
@@ -30,13 +30,13 @@ class riscv_rand_instr_test extends riscv_instr_base_test;
 
   virtual function void apply_directed_instr();
     // Mix below directed instruction streams with the random instructions
-    asm_gen.add_directed_instr_stream("riscv_load_store_rand_instr_stream", 4);
-    asm_gen.add_directed_instr_stream("riscv_loop_instr", 3);
-    asm_gen.add_directed_instr_stream("riscv_jal_instr", 4);
-    asm_gen.add_directed_instr_stream("riscv_hazard_instr_stream", 4);
-    asm_gen.add_directed_instr_stream("riscv_load_store_hazard_instr_stream", 4);
-    asm_gen.add_directed_instr_stream("riscv_multi_page_load_store_instr_stream", 4);
-    asm_gen.add_directed_instr_stream("riscv_mem_region_stress_test", 4);
+    // asm_gen.add_directed_instr_stream("riscv_load_store_rand_instr_stream", 4);
+    // asm_gen.add_directed_instr_stream("riscv_loop_instr", 3);
+    // asm_gen.add_directed_instr_stream("riscv_jal_instr", 4);
+    // asm_gen.add_directed_instr_stream("riscv_hazard_instr_stream", 4);
+    // asm_gen.add_directed_instr_stream("riscv_load_store_hazard_instr_stream", 4);
+    // asm_gen.add_directed_instr_stream("riscv_multi_page_load_store_instr_stream", 4);
+    // asm_gen.add_directed_instr_stream("riscv_mem_region_stress_test", 4);
   endfunction
 
 endclass

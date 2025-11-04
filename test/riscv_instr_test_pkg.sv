@@ -21,6 +21,6 @@ package riscv_instr_test_pkg;
 
   `include "riscv_instr_base_test.sv"
   `include "riscv_instr_test_lib.sv"
-  `include "riscv_instr_cov_test.sv"
+  // `include "riscv_instr_cov_test.sv"
 
 endpackage

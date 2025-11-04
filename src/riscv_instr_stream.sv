@@ -83,7 +83,7 @@ class riscv_instr_stream extends uvm_object;
     if(idx == -1) begin
       idx = $urandom_range(0, current_instr_cnt-1);
       repeat(10) begin
-       if (instr_list[idx].atomic) break;
+       if (!instr_list[idx].atomic) break;    // 原代码疑似有错
        idx = $urandom_range(0, current_instr_cnt-1);
       end
       if (instr_list[idx].atomic) begin
@@ -176,7 +176,7 @@ class riscv_rand_instr_stream extends riscv_instr_stream;
     end
   endfunction
 
-  virtual function void setup_allowed_instr(bit no_branch = 1'b0, bit no_load_store = 1'b1);
+  virtual function void setup_allowed_instr(bit no_branch = 1'b1, bit no_load_store = 1'b1);    // 默认没有branch和load/store
     allowed_instr = riscv_instr::basic_instr;
     if (no_branch == 0) begin
       allowed_instr = {allowed_instr, riscv_instr::instr_category[BRANCH]};
@@ -192,7 +192,6 @@ class riscv_rand_instr_stream extends riscv_instr_stream;
     if(avail_regs.size() > 0) begin
       `DV_CHECK_STD_RANDOMIZE_WITH_FATAL(avail_regs,
                                          unique{avail_regs};
-                                         avail_regs[0] inside {[S0 : A5]};
                                          foreach(avail_regs[i]) {
                                            !(avail_regs[i] inside {cfg.reserved_regs, reserved_rd});
                                          },
@@ -200,7 +199,7 @@ class riscv_rand_instr_stream extends riscv_instr_stream;
     end
   endfunction
 
-  function void setup_instruction_dist(bit no_branch = 1'b0, bit no_load_store = 1'b1);
+  function void setup_instruction_dist(bit no_branch = 1'b1, bit no_load_store = 1'b1);
     if (cfg.dist_control_mode) begin
       category_dist = cfg.category_dist;
       if (no_branch) begin
@@ -214,7 +213,7 @@ class riscv_rand_instr_stream extends riscv_instr_stream;
     end
   endfunction
 
-  virtual function void gen_instr(bit no_branch = 1'b0, bit no_load_store = 1'b1,
+  virtual function void gen_instr(bit no_branch = 1'b1, bit no_load_store = 1'b1,
                                   bit is_debug_program = 1'b0);
     setup_allowed_instr(no_branch, no_load_store);
     foreach(instr_list[i]) begin
@@ -232,22 +231,22 @@ class riscv_rand_instr_stream extends riscv_instr_stream;
                                 input  bit is_in_debug = 1'b0,
                                 input  bit disable_dist = 1'b0,
                                 input  riscv_instr_group_t include_group[$] = {});
-    riscv_instr_name_t exclude_instr[];
-    if ((SP inside {reserved_rd, cfg.reserved_regs}) ||
-        ((avail_regs.size() > 0) && !(SP inside {avail_regs}))) begin
-      exclude_instr = {C_ADDI4SPN, C_ADDI16SP, C_LWSP, C_LDSP};
-    end
+    riscv_instr_name_t exclude_instr[]; 
+    // if ((SP inside {reserved_rd, cfg.reserved_regs}) ||
+    //     ((avail_regs.size() > 0) && !(SP inside {avail_regs}))) begin
+    //   exclude_instr = {C_ADDI4SPN, C_ADDI16SP, C_LWSP, C_LDSP};
+    // end
     // Post-process the allowed_instr and exclude_instr lists to handle
     // adding ebreak instructions to the debug rom.
-    if (is_in_debug) begin
-      if (cfg.no_ebreak && cfg.enable_ebreak_in_debug_rom) begin
-        allowed_instr = {allowed_instr, EBREAK, C_EBREAK};
-      end else if (!cfg.no_ebreak && !cfg.enable_ebreak_in_debug_rom) begin
-        exclude_instr = {exclude_instr, EBREAK, C_EBREAK};
-      end
-    end
+    // if (is_in_debug) begin
+    //   if (cfg.no_ebreak && cfg.enable_ebreak_in_debug_rom) begin
+    //     allowed_instr = {allowed_instr, EBREAK, C_EBREAK};
+    //   end else if (!cfg.no_ebreak && !cfg.enable_ebreak_in_debug_rom) begin
+    //     exclude_instr = {exclude_instr, EBREAK, C_EBREAK};
+    //   end
+    // end
     instr = riscv_instr::get_rand_instr(.include_instr(allowed_instr),
-                                        .exclude_instr(exclude_instr),
+                                         .exclude_instr(exclude_instr),
                                         .include_group(include_group));
     instr.m_cfg = cfg;
     randomize_gpr(instr);
@@ -270,45 +269,50 @@ class riscv_rand_instr_stream extends riscv_instr_stream;
         if (has_rd) {
           rd != reserved_rd[i];
         }
-        if (format == CB_FORMAT) {
-          rs1 != reserved_rd[i];
-        }
+        // if (format == CB_FORMAT) {
+        //   rs1 != reserved_rd[i];
+        // }
       }
       foreach (cfg.reserved_regs[i]) {
         if (has_rd) {
           rd != cfg.reserved_regs[i];
         }
-        if (format == CB_FORMAT) {
-          rs1 != cfg.reserved_regs[i];
-        }
+        // if (format == CB_FORMAT) {
+        //   rs1 != cfg.reserved_regs[i];
+        // }
       }
       // TODO: Add constraint for CSR, floating point register
     )
   endfunction
 
   function riscv_instr get_init_gpr_instr(riscv_reg_t gpr, bit [XLEN-1:0] val);
-    riscv_pseudo_instr li_instr;
-    li_instr = riscv_pseudo_instr::type_id::create("li_instr");
-    `DV_CHECK_RANDOMIZE_WITH_FATAL(li_instr,
-       pseudo_instr_name == LI;
-       rd == gpr;
+    riscv_instr addiw_instr;
+
+    // 获取 ADDIW 指令对象
+    $cast(addiw_instr, riscv_instr::get_instr(ADDI_W));
+    addiw_instr.m_cfg = cfg;
+
+    // 约束：rs1 = ZERO，相当于从 0 加立即数；rd = 目标寄存器；imm = imm12
+    `DV_CHECK_RANDOMIZE_WITH_FATAL(addiw_instr,
+      rs1 == ZERO;
+      rd  == gpr;
+      imm == val[11:0];
     )
-    li_instr.imm_str = $sformatf("0x%0x", val);
-    return li_instr;
+    return addiw_instr;
   endfunction
 
-  function void add_init_vector_gpr_instr(riscv_vreg_t gpr, bit [XLEN-1:0] val);
-    riscv_vector_instr instr;
-    $cast(instr, riscv_instr::get_instr(VMV));
-    instr.m_cfg = cfg;
-    instr.avoid_reserved_vregs_c.constraint_mode(0);
-    `DV_CHECK_RANDOMIZE_WITH_FATAL(instr,
-      va_variant == VX;
-      vd == gpr;
-      rs1 == cfg.gpr[0];
-    )
-    instr_list.push_front(instr);
-    instr_list.push_front(get_init_gpr_instr(cfg.gpr[0], val));
-  endfunction
+  // function void add_init_vector_gpr_instr(riscv_vreg_t gpr, bit [XLEN-1:0] val);
+  //   riscv_vector_instr instr;
+  //   $cast(instr, riscv_instr::get_instr(VMV));
+  //   instr.m_cfg = cfg;
+  //   instr.avoid_reserved_vregs_c.constraint_mode(0);
+  //   `DV_CHECK_RANDOMIZE_WITH_FATAL(instr,
+  //     va_variant == VX;
+  //     vd == gpr;
+  //     rs1 == cfg.gpr[0];
+  //   )
+  //   instr_list.push_front(instr);
+  //   instr_list.push_front(get_init_gpr_instr(cfg.gpr[0], val));
+  // endfunction
 
 endclass
