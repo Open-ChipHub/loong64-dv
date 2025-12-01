@@ -3,7 +3,7 @@
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+* You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -256,10 +256,24 @@ class riscv_instr extends uvm_object;
         has_rs3 = 1'b1;
         has_imm = 1'b0;
       end
-      R2I8_TYPE, R2I12_TYPE, R2I14_TYPE, R2I16_TYPE : has_rs2 = 1'b0;
+      R2I8_TYPE, R2I12_TYPE, R2I14_TYPE, R2I16_TYPE : begin
+		has_rs2 = 1'b0;
+        if (instr_name inside {BEQ, BNE, BLT, BGE, BLTU, BGEU}) begin
+          has_rd = 1'b0;
+          has_rs2 = 1'b1;
+		end
+	  end
       R1I21_TYPE : begin
-        has_rd = 1'b0;
-        has_rs2 = 1'b0;
+		if(instr_name inside {LU12I_W, LU32I_D, PCADDI, PCADDU12I, PCADDU18I, PCALAU12I})begin
+          has_rs1 = 1'b0;
+	  	  has_rs2 = 1'b0;
+		end else if (instr_name inside {BEQZ, BNEZ}) begin
+		  has_rd  = 1'b0;
+		  has_rs2 = 1'b0; 
+		end else begin
+          has_rd = 1'b0;
+          has_rs2 = 1'b0;
+		end
       end
       I26_TYPE: begin
         has_rd = 1'b0;
@@ -290,7 +304,12 @@ class riscv_instr extends uvm_object;
     end else if(format == R2I16_TYPE) begin
       imm_len = 16;
     end else if(format == R1I21_TYPE) begin
-      imm_len = 21;
+	  // LU12I_W和LU32I_D使用20位立即数，但使用R1I21_TYPE格式
+      if (instr_name inside {LU12I_W, LU32I_D, PCADDI, PCADDU12I, PCADDU18I, PCALAU12I}) begin
+        imm_len = 20;
+      end else begin
+        imm_len = 21;
+      end
     end else if(format == I26_TYPE) begin
       imm_len = 26;
     end
@@ -324,14 +343,25 @@ class riscv_instr extends uvm_object;
         R3_TYPE:
           asm_str = $sformatf("%0s$%0s, $%0s, $%0s", asm_str, rd.name(), rs1.name(), rs2.name());
         R4_TYPE:
-          asm_str = $sformatf("%0s$%0s, $%0s, $%0s, $%0s", asm_str, rd.name(), rs1.name(), rs2.name(), rs3.name());
-        R2I8_TYPE, R2I12_TYPE, R2I14_TYPE, R2I16_TYPE:
+          	 asm_str = $sformatf("%0s$%0s, $%0s, $%0s, $%0s", asm_str, rd.name(), rs1.name(), rs2.name(), rs3.name());
+		R2I8_TYPE, R2I12_TYPE, R2I14_TYPE:
           if(instr_name == NOP)
             asm_str = "nop";
           else
             asm_str = $sformatf("%0s$%0s, $%0s, %0s", asm_str, rd.name(), rs1.name(), get_imm());   // 注意：get_imm()要修改，imm_len=8时立即数不到8位
+        R2I16_TYPE:
+          if (instr_name inside {BEQ, BNE, BLT, BGE, BLTU, BGEU}) begin
+            asm_str = $sformatf("%0s$%0s, $%0s, %0s", asm_str, rs1.name(), rs2.name(), get_imm());
+          end else begin
+            asm_str = $sformatf("%0s$%0s, $%0s, %0s", asm_str, rd.name(), rs1.name(), get_imm());
+          end
         R1I21_TYPE:
-          asm_str = $sformatf("%0s$%0s, %0s", asm_str, rs1.name(), get_imm());
+ 			// LU12I_W和LU32I_D格式：lu12i.w rd, si20 (使用rd而不是rs1)
+          if (instr_name inside {LU12I_W, LU32I_D, PCADDI, PCADDU12I, PCADDU18I, PCALAU12I}) begin
+            asm_str = $sformatf("%0s$%0s, %0s", asm_str, rd.name(), get_imm());
+          end else begin
+            asm_str = $sformatf("%0s$%0s, %0s", asm_str, rs1.name(), get_imm());
+          end
         I26_TYPE:
           asm_str = $sformatf("%0s%0s", asm_str, get_imm());
         default: `uvm_fatal(`gfn, $sformatf("Unsupported format %0s [%0s]",
@@ -578,7 +608,21 @@ class riscv_instr extends uvm_object;
   // Default return imm value directly, can be overriden to use labels and symbols
   // Example: %hi(symbol), %pc_rel(label) ...
   virtual function string get_imm();
+	bit [XLEN-1:0] effective_imm;
+  
+  if (imm_len > 0 && imm_len < XLEN) begin
+    // 提取有效的立即数位
+    effective_imm = imm & ((1 << imm_len) - 1);
+    
+    // 如果是负数，进行符号扩展
+    if (imm_type != UIMM && imm_type != NZUIMM && effective_imm[imm_len-1]) begin
+      effective_imm = effective_imm | (~((1 << imm_len) - 1));
+    end
+    
+    return $sformatf("%0d", $signed(effective_imm));
+  end else begin
     return imm_str;
+  end
   endfunction
 
   virtual function void clear_unused_label();
