@@ -159,6 +159,15 @@ def parse_iss_yaml(iss, iss_yaml, isa, priv, setting_dir, debug_cmd):
             m = re.search(r"rv(?P<xlen>[0-9]+?)(?P<variant>[a-zA-Z_]+?)$", isa)
             if m:
                 cmd = re.sub("\<xlen\>", m.group('xlen'), cmd)
+            elif isa.startswith("la"):
+                # Support LoongArch ISA (la64, etc.)
+                # Extract xlen from la64 -> 64
+                la_match = re.search(r"la(?P<xlen>[0-9]+)", isa)
+                if la_match:
+                    cmd = re.sub("\<xlen\>", la_match.group('xlen'), cmd)
+                else:
+                    # Default to 64 for LoongArch
+                    cmd = re.sub("\<xlen\>", "64", cmd)
             else:
                 logging.error("Illegal ISA {}".format(isa))
             if iss == "ovpsim":
@@ -436,7 +445,7 @@ def gcc_compile(test_list, output_dir, isa, mabi, opts, debug_cmd):
                 logging.error("Cannot find assembly test: {}\n".format(asm))
                 sys.exit(RET_FAIL)
             # gcc compilation
-            cmd = ("{} -static -mcmodel=medany \
+            cmd = ("{} -static \
              -fvisibility=hidden -nostdlib \
              -nostartfiles {} \
              -I{}/user_extension \
@@ -500,7 +509,7 @@ def run_assembly(asm_test, iss_yaml, isa, mabi, gcc_opts, iss_opts, output_dir,
     logging.info("Compiling assembly test : {}".format(asm_test))
 
     # gcc compilation
-    cmd = ("{} -static -mcmodel=medany \
+    cmd = ("{} -static \
          -fvisibility=hidden -nostdlib \
          -nostartfiles {} \
          -I{}/user_extension \
@@ -521,7 +530,7 @@ def run_assembly(asm_test, iss_yaml, isa, mabi, gcc_opts, iss_opts, output_dir,
         run_cmd("mkdir -p {}/{}_sim".format(output_dir, iss))
         log = ("{}/{}_sim/{}.log".format(output_dir, iss, asm))
         log_list.append(log)
-        base_cmd = parse_iss_yaml(iss, iss_yaml, isa, setting_dir, debug_cmd)
+        base_cmd = parse_iss_yaml(iss, iss_yaml, isa, "m", setting_dir, debug_cmd)
         logging.info("[{}] Running ISS simulation: {}".format(iss, elf))
         cmd = get_iss_cmd(base_cmd, elf, log)
         run_cmd(cmd, 10, debug_cmd=debug_cmd)
@@ -593,7 +602,7 @@ def run_c(c_test, iss_yaml, isa, mabi, gcc_opts, iss_opts, output_dir,
     logging.info("Compiling c test : {}".format(c_test))
 
     # gcc compilation
-    cmd = ("{} -mcmodel=medany -nostdlib \
+    cmd = ("{} -nostdlib \
          -nostartfiles {} \
          -I{}/user_extension \
          -T{}/scripts/link.ld {} -o {} ".format(
@@ -953,8 +962,8 @@ def load_config(args, cwd):
             args.mabi = "ilp32"
             args.isa = "rv32imc_zicsr_zifencei"
         elif args.target == "LA64":
-            args.mabi = "lp64"
-            args.isa = "la64"
+            args.mabi = "lp64d"
+            args.isa = "la464"
         elif args.target == "rv32imafdc":
             args.mabi = "ilp32"
             args.isa = "rv32imafdc_zicsr_zifencei"

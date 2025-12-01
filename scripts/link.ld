@@ -13,7 +13,7 @@
 * limitations under the License.
 */
 
-OUTPUT_ARCH( "riscv" )
+OUTPUT_ARCH( "loongarch" )
 ENTRY(_start)
 
 SECTIONS

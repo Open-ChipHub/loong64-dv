@@ -17,3 +17,4 @@
 -lca
 +define+UVM_REGEX_NO_DPI
 -timescale=1ns/10ps
+-P /opt/synopsys/verdi201809/share/PLI/VCS/LINUX64/verdi.tab  /opt/synopsys/verdi201809/share/PLI/VCS/LINUX64/pli.a

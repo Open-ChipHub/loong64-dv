@@ -41,3 +41,8 @@
   path_var: RENODE_PATH
   cmd: >
     python3 <scripts_path>/renode_wrapper.py --renode "<path_var>" --elf <elf> --isa <variant> --priv=<priv> --mem-size 0x80000000
+
+- iss: la_emu
+  path_var: LA_EMU_PATH
+  cmd: >
+    <path_var>/la_emu_user -d exec,cpu <elf> 
