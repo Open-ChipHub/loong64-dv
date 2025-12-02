@@ -83,6 +83,25 @@ class riscv_instr extends uvm_object;
   //   }
   // }
 
+  constraint la64_rd_zero_c {
+    if (group == LA64 && has_rd) {
+      rd != ZERO;
+    }
+  }
+
+  // LoongArch: Shift instruction immediate value range constraints
+  constraint la64_shift_imm_c {
+    // 32-bit shift instructions: shift amount should be 0-31 (5 bits)
+    if (group == LA64 && category == SHIFT && has_imm) {
+      if (instr_name inside {SLLI_W, SRLI_W, SRAI_W, ROTRI_W}) {
+        imm[11:5] == 0;  // Limit to 0-31 range
+      }
+      // 64-bit shift instructions: shift amount should be 0-63 (6 bits)
+      if (instr_name inside {SLLI_D, SRLI_D, SRAI_D, ROTRI_D}) {
+        imm[11:6] == 0;  // Limit to 0-63 range
+      }
+    }
+  }
 
   `uvm_object_utils(riscv_instr)
   `uvm_object_new
@@ -608,21 +627,7 @@ class riscv_instr extends uvm_object;
   // Default return imm value directly, can be overriden to use labels and symbols
   // Example: %hi(symbol), %pc_rel(label) ...
   virtual function string get_imm();
-	bit [XLEN-1:0] effective_imm;
-  
-  if (imm_len > 0 && imm_len < XLEN) begin
-    // 提取有效的立即数位
-    effective_imm = imm & ((1 << imm_len) - 1);
-    
-    // 如果是负数，进行符号扩展
-    if (imm_type != UIMM && imm_type != NZUIMM && effective_imm[imm_len-1]) begin
-      effective_imm = effective_imm | (~((1 << imm_len) - 1));
-    end
-    
-    return $sformatf("%0d", $signed(effective_imm));
-  end else begin
     return imm_str;
-  end
   endfunction
 
   virtual function void clear_unused_label();
