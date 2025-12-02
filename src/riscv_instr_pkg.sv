@@ -222,7 +222,7 @@ package riscv_instr_pkg;
     BL,
     JIRL,
     // 普通访存指令
-    LD_B.
+    LD_B,
     LD_BU,
     LD_H,
     LD_HU,
