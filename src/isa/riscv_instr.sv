@@ -69,20 +69,6 @@ class riscv_instr extends uvm_object;
   bit                        has_rd = 1'b1;
   bit                        has_imm = 1'b1;
 
-  // 不需要
-  // constraint imm_c {
-  //   if (instr_name inside {SLLIW, SRLIW, SRAIW}) {
-  //     imm[11:5] == 0;
-  //   }
-  //   if (instr_name inside {SLLI, SRLI, SRAI}) {
-  //     if (XLEN == 32) {
-  //       imm[11:5] == 0;
-  //     } else {
-  //       imm[11:6] == 0;
-  //     }
-  //   }
-  // }
-
   constraint la64_rd_zero_c {
     if (group == LA64 && has_rd) {
       rd != ZERO;
@@ -100,6 +86,13 @@ class riscv_instr extends uvm_object;
       if (instr_name inside {SLLI_D, SRLI_D, SRAI_D, ROTRI_D}) {
         imm[11:6] == 0;  // Limit to 0-63 range
       }
+    }
+  }
+
+  // LoongArch: Jump instructions immediate must be word-aligned (low 2 bits zero)
+  constraint la64_jump_imm_c {
+    if (group == LA64 && (category == BRANCH || category == JUMP)) {
+      imm[1:0] == 0;
     }
   }
 
@@ -157,7 +150,7 @@ class riscv_instr extends uvm_object;
 
   static function void build_basic_instruction_list(riscv_instr_gen_config cfg);
     basic_instr = {instr_category[SHIFT], instr_category[ARITHMETIC],
-                   instr_category[LOGICAL], instr_category[COMPARE]};
+                   instr_category[LOGICAL], instr_category[COMPARE], instr_category[JUMP], instr_category[BRANCH]};
     // if ((cfg.no_csr_instr == 0) && (cfg.init_privileged_mode == MACHINE_MODE)) begin
     //   basic_instr = {basic_instr, instr_category[CSR]};
     // end
@@ -358,14 +351,58 @@ class riscv_instr extends uvm_object;
     if(category != SYSTEM) begin
       case(format)
         R2_TYPE:
-          asm_str = $sformatf("%0s$%0s, $%0s", asm_str, rd.name(), rs1.name());
+			asm_str = $sformatf("%0s$%0s, $%0s", asm_str, rd.name(), rs1.name());
         R3_TYPE:
-          asm_str = $sformatf("%0s$%0s, $%0s, $%0s", asm_str, rd.name(), rs1.name(), rs2.name());
+			// ALSL 指令需要添加 sa2 (1-4 的随机值)
+          if (instr_name inside {ALSL_W, ALSL_WU, ALSL_D}) begin
+            bit [2:0] sa2 = $urandom_range(1, 4);
+            asm_str = $sformatf("%0s$%0s, $%0s, $%0s, %0d", asm_str, rd.name(), rs1.name(), rs2.name(), sa2);
+		  end 
+		  else if (instr_name == BYTEPICK_W) begin
+			bit [1:0] sa2 = $urandom_range(0, 3);
+            asm_str = $sformatf("%0s$%0s, $%0s, $%0s, %0d", asm_str, rd.name(), rs1.name(), rs2.name(), sa2);
+		  end
+		  else if (instr_name == BYTEPICK_D) begin
+            bit [2:0] sa3 = $urandom_range(0, 7);
+            asm_str = $sformatf("%0s$%0s, $%0s, $%0s, %0d", asm_str, rd.name(), rs1.name(), rs2.name(), sa3);
+          end
+		  // PRELDX: 语法为 preldx hint, rj, rk，其中 hint 为 0-31
+          else if (instr_name == PRELDX) begin
+            bit [4:0] hint = $urandom_range(0, 31);
+            asm_str = $sformatf("%0s%0d, $%0s, $%0s", asm_str, hint, rs1.name(), rs2.name());
+          end
+          else begin
+            asm_str = $sformatf("%0s$%0s, $%0s, $%0s", asm_str, rd.name(), rs1.name(), rs2.name());
+          end
         R4_TYPE:
           	 asm_str = $sformatf("%0s$%0s, $%0s, $%0s, $%0s", asm_str, rd.name(), rs1.name(), rs2.name(), rs3.name());
 		R2I8_TYPE, R2I12_TYPE, R2I14_TYPE:
           if(instr_name == NOP)
             asm_str = "nop";
+		  // STPTR/LDPTR 指令：立即数字段 si14 表示按字（4 字节）对齐的偏移，需要左移 2 位转换为字节
+          else if (instr_name inside {STPTR_W, STPTR_D, LDPTR_W, LDPTR_D}) begin
+            longint signed ptr_off = $signed(imm);
+            ptr_off = ptr_off <<< 2;
+            asm_str = $sformatf("%0s$%0s, $%0s, %0d", asm_str, rd.name(), rs1.name(), ptr_off);
+          end
+		  // PRELD：语法为 preld hint, rj, si12，hint 范围 0-31
+          else if (instr_name == PRELD) begin
+            bit [4:0] hint = $urandom_range(0, 31);
+            asm_str = $sformatf("%0s%0d, $%0s, %0s", asm_str, hint, rs1.name(), get_imm());
+          end
+          // BSTRPICK/BSTRINS 指令需要随机生成 msbw/lsbw 或 msbd/lsbd
+          // .W 版本：msbw 和 lsbw 都是 0-31（5位），且 msbw >= lsbw
+          else if (instr_name inside {BSTRPICK_W, BSTRINS_W}) begin
+            bit [4:0] msbw = $urandom_range(0, 31);
+            bit [4:0] lsbw = $urandom_range(0, msbw);  // 确保 msbw >= lsbw
+            asm_str = $sformatf("%0s$%0s, $%0s, %0d, %0d", asm_str, rd.name(), rs1.name(), msbw, lsbw);
+          end
+		  // BSTRPICK.D / BSTRINS.D: msbd 和 lsbd 都是 0-63（6位），且 msbd >= lsbd
+          else if (instr_name inside {BSTRPICK_D, BSTRINS_D}) begin	
+            bit [5:0] msbd = $urandom_range(0, 63);
+            bit [5:0] lsbd = $urandom_range(0, msbd);  // 确保 msbd >= lsbd
+            asm_str = $sformatf("%0s$%0s, $%0s, %0d, %0d", asm_str, rd.name(), rs1.name(), msbd, lsbd);
+          end
           else
             asm_str = $sformatf("%0s$%0s, $%0s, %0s", asm_str, rd.name(), rs1.name(), get_imm());   // 注意：get_imm()要修改，imm_len=8时立即数不到8位
         R2I16_TYPE:
