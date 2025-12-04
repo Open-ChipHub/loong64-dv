@@ -28,6 +28,11 @@ class riscv_instr_stream extends uvm_object;
   // Some additional reserved registers that should not be used as rd register
   // by this instruction stream
   riscv_reg_t           reserved_rd[];
+  // User can specify a small group of available floating point registers
+  rand riscv_fpr_t      avail_fprs[];
+  // Some additional reserved floating point registers that should not be used as fd register
+  // by this instruction stream
+  riscv_fpr_t           reserved_fd[];
   int                   hart;
 
   `uvm_object_utils(riscv_instr_stream)
@@ -199,6 +204,17 @@ class riscv_rand_instr_stream extends riscv_instr_stream;
     end
   endfunction
 
+  virtual function void randomize_avail_fprs();
+    if(avail_fprs.size() > 0) begin
+      `DV_CHECK_STD_RANDOMIZE_WITH_FATAL(avail_fprs,
+                                         unique{avail_fprs};
+                                         foreach(avail_fprs[i]) {
+                                           !(avail_fprs[i] inside {reserved_fd});
+                                         },
+                                         "Cannot randomize avail_fprs")
+    end
+  endfunction
+
   function void setup_instruction_dist(bit no_branch = 1'b1, bit no_load_store = 1'b1);
     if (cfg.dist_control_mode) begin
       category_dist = cfg.category_dist;
@@ -253,36 +269,63 @@ class riscv_rand_instr_stream extends riscv_instr_stream;
   endfunction
 
   function void randomize_gpr(riscv_instr instr);
-    `DV_CHECK_RANDOMIZE_WITH_FATAL(instr,
-      if (avail_regs.size() > 0) {
-        if (has_rs1) {
-          rs1 inside {avail_regs};
+    riscv_floating_point_instr fp_instr;
+    // 检查是否是浮点指令
+    if ($cast(fp_instr, instr)) begin
+      // 浮点指令：随机化浮点寄存器
+      `DV_CHECK_RANDOMIZE_WITH_FATAL(fp_instr,
+        if (avail_fprs.size() > 0) {
+          if (has_fs1) {
+            fs1 inside {avail_fprs};
+          }
+          if (has_fs2) {
+            fs2 inside {avail_fprs};
+          }
+          if (has_fs3) {
+            fs3 inside {avail_fprs};
+          }
+          if (has_fd) {
+            fd  inside {avail_fprs};
+          }
         }
-        if (has_rs2) {
-          rs2 inside {avail_regs};
+        foreach (reserved_fd[i]) {
+          if (has_fd) {
+            fd != reserved_fd[i];
+          }
         }
-        if (has_rd) {
-          rd  inside {avail_regs};
+      )
+    end else begin
+      // 整数指令：随机化通用寄存器
+      `DV_CHECK_RANDOMIZE_WITH_FATAL(instr,
+        if (avail_regs.size() > 0) {
+          if (has_rs1) {
+            rs1 inside {avail_regs};
+          }
+          if (has_rs2) {
+            rs2 inside {avail_regs};
+          }
+          if (has_rd) {
+            rd  inside {avail_regs};
+          }
         }
-      }
-      foreach (reserved_rd[i]) {
-        if (has_rd) {
-          rd != reserved_rd[i];
+        foreach (reserved_rd[i]) {
+          if (has_rd) {
+            rd != reserved_rd[i];
+          }
+          // if (format == CB_FORMAT) {
+          //   rs1 != reserved_rd[i];
+          // }
         }
-        // if (format == CB_FORMAT) {
-        //   rs1 != reserved_rd[i];
-        // }
-      }
-      foreach (cfg.reserved_regs[i]) {
-        if (has_rd) {
-          rd != cfg.reserved_regs[i];
+        foreach (cfg.reserved_regs[i]) {
+          if (has_rd) {
+            rd != cfg.reserved_regs[i];
+          }
+          // if (format == CB_FORMAT) {
+          //   rs1 != cfg.reserved_regs[i];
+          // }
         }
-        // if (format == CB_FORMAT) {
-        //   rs1 != cfg.reserved_regs[i];
-        // }
-      }
-      // TODO: Add constraint for CSR, floating point register
-    )
+      )
+    end
   endfunction
 
   function riscv_instr get_init_gpr_instr(riscv_reg_t gpr, bit [XLEN-1:0] val);
