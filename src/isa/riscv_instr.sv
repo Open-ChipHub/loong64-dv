@@ -150,7 +150,7 @@ class riscv_instr extends uvm_object;
 
   static function void build_basic_instruction_list(riscv_instr_gen_config cfg);
     basic_instr = {instr_category[SHIFT], instr_category[ARITHMETIC],
-                   instr_category[LOGICAL], instr_category[COMPARE], instr_category[JUMP], instr_category[BRANCH]};
+                   instr_category[LOGICAL], instr_category[COMPARE], instr_category[BITOPERATION]};
     // if ((cfg.no_csr_instr == 0) && (cfg.init_privileged_mode == MACHINE_MODE)) begin
     //   basic_instr = {basic_instr, instr_category[CSR]};
     // end
@@ -370,6 +370,10 @@ class riscv_instr extends uvm_object;
           else if (instr_name == PRELDX) begin
             bit [4:0] hint = $urandom_range(0, 31);
             asm_str = $sformatf("%0s%0d, $%0s, $%0s", asm_str, hint, rs1.name(), rs2.name());
+          end
+		  // 原子访存指令：格式为 rd, rk, rj（即 rd, rs2, rs1）
+          else if (category == AMO) begin
+            asm_str = $sformatf("%0s$%0s, $%0s, $%0s", asm_str, rd.name(), rs2.name(), rs1.name());
           end
           else begin
             asm_str = $sformatf("%0s$%0s, $%0s, $%0s", asm_str, rd.name(), rs1.name(), rs2.name());

@@ -250,6 +250,99 @@ package riscv_instr_pkg;
     STPTR_D,
     PRELD,
     PRELDX,
+	// 边界检查访存指令
+    LDGT_B,
+    LDGT_H,
+    LDGT_W,
+    LDGT_D,
+    LDLE_B,
+    LDLE_H,
+    LDLE_W,
+    LDLE_D,
+    STGT_B,
+    STGT_H,
+    STGT_W,
+    STGT_D,
+    STLE_B,
+    STLE_H,
+    STLE_W,
+    STLE_D,
+	// 原子访存指令
+    AMSWAP_W,
+    AMSWAP_D,
+    AMADD_W,
+    AMADD_D,
+    AMAND_W,
+    AMAND_D,
+    AMOR_W,
+    AMOR_D,
+    AMXOR_W,
+    AMXOR_D,
+    AMMAX_W,
+    AMMAX_D,
+    AMMIN_W,
+    AMMIN_D,
+    AMMAX_WU,
+    AMMAX_DU,
+    AMMIN_WU,
+    AMMIN_DU,
+    AMSWAP_DB_W,
+    AMSWAP_DB_D,
+    AMADD_DB_W,
+    AMADD_DB_D,
+    AMAND_DB_W,
+    AMAND_DB_D,
+    AMOR_DB_W,
+    AMOR_DB_D,
+    AMXOR_DB_W,
+    AMXOR_DB_D,
+    AMMAX_DB_W,
+    AMMAX_DB_D,
+    AMMIN_DB_W,
+    AMMIN_DB_D,
+    AMMAX_DB_WU,
+    AMMAX_DB_DU,
+    AMMIN_DB_WU,
+    AMMIN_DB_DU,
+	AMSWAP_DB_B,
+    AMSWAP_DB_H,
+    AMADD_DB_B,
+    AMADD_DB_H,
+	AMSWAP_B,
+    AMSWAP_H,
+	AMADD_B,
+    AMADD_H,
+	AMCAS_B,
+    AMCAS_H,
+    AMCAS_W,
+    AMCAS_D,
+	AMCAS_DB_B,
+    AMCAS_DB_H,
+    AMCAS_DB_W,
+    AMCAS_DB_D,
+	SC_Q,
+	LL_W,
+    LL_D,
+    SC_W,
+    SC_D,
+	LL_ACQ_W,
+    LL_ACQ_D,
+    SC_REL_W,
+    SC_REL_D,
+	// 栅障指令
+	//DBAR,
+	//IBAR,
+	// CRC校验指令
+    CRC_W_B_W,
+    CRC_W_H_W,
+    CRC_W_W_W,
+    CRC_W_D_W,
+    CRCC_W_B_W,
+    CRCC_W_H_W,
+    CRCC_W_W_W,
+    CRCC_W_D_W,
+	// 浮点指令
+    FADD_S,
     // Custom instructions
     `include "isa/custom/riscv_custom_instr_enum.sv"
     // You can add other instructions here
@@ -762,7 +855,7 @@ package riscv_instr_pkg;
   // `include "isa/riscv_zbs_instr.sv"
   // `include "isa/riscv_b_instr.sv"
   // `include "isa/riscv_csr_instr.sv"
-  // `include "isa/riscv_floating_point_instr.sv"
+  `include "isa/riscv_floating_point_instr.sv"
   // `include "isa/riscv_vector_instr.sv"
   // `include "isa/riscv_compressed_instr.sv"
   // `include "isa/rv32a_instr.sv"
@@ -793,6 +886,7 @@ package riscv_instr_pkg;
   // `include "isa/custom/rv32x_instr.sv"
   // `include "isa/custom/rv64x_instr.sv"
   `include "isa/la64i_instr.sv"
+  `include "isa/la64f_instr.sv"
 
   // `include "riscv_pseudo_instr.sv"
   // `include "riscv_illegal_instr.sv"
