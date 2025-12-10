@@ -46,7 +46,7 @@ class riscv_asm_program_gen extends uvm_object;
    // riscv_callstack_gen                 callstack_gen;
    // riscv_privileged_common_seq         privil_seq;
    // Directed instruction ratio, occurance per 1000 instructions
-   // int unsigned                        directed_instr_stream_ratio[string];
+   int unsigned                        directed_instr_stream_ratio[string];
    // riscv_page_table_list#(SATP_MODE)   page_table_list;
    int                                 hart;
 
@@ -105,11 +105,11 @@ class riscv_asm_program_gen extends uvm_object;
       main_program[hart].instr_cnt = cfg.main_program_instr_cnt;
       main_program[hart].is_debug_program = 0;
       main_program[hart].label_name = main_program[hart].get_name();
-      // generate_directed_instr_stream(.hart(hart),
-      //                                .label(main_program[hart].label_name),
-      //                                .original_instr_cnt(main_program[hart].instr_cnt),
-      //                                .min_insert_cnt(1),
-      //                                .instr_stream(main_program[hart].directed_instr));
+      generate_directed_instr_stream(.hart(hart),
+                                     .label(main_program[hart].label_name),
+                                     .original_instr_cnt(main_program[hart].instr_cnt),
+                                     .min_insert_cnt(1),
+                                     .instr_stream(main_program[hart].directed_instr));
       main_program[hart].cfg = cfg;
       `DV_CHECK_RANDOMIZE_FATAL(main_program[hart])
       main_program[hart].gen_instr(.is_main_program(1), .no_branch(cfg.no_branch_jump));
@@ -420,9 +420,9 @@ class riscv_asm_program_gen extends uvm_object;
     string str;
     // str = format_string(get_label("init:", hart), LABEL_STR_LEN);
     // instr_stream.push_back(str);
-    // if (cfg.enable_floating_point) begin
-    //   init_floating_point_gpr();
-    // end
+    if (cfg.enable_floating_point) begin
+      init_floating_point_gpr();
+    end
     init_gpr();
     // Init stack pointer to point to the end of the user stack
     // str = {indent, $sformatf("la x%0d, %0suser_stack_end", cfg.sp, hart_prefix(hart))};
@@ -537,6 +537,38 @@ class riscv_asm_program_gen extends uvm_object;
           ['hF000_0000 : 'hFFFF_FFFF] :/ 1
         };)
       str = $sformatf("%0sli.d $r%0d, 0x%0x", indent, i, reg_val);
+      instr_stream.push_back(str);
+    end
+  endfunction
+
+  // Initialize floating point general purpose registers (LoongArch)
+  virtual function void init_floating_point_gpr();
+    string str;
+    bit [DATA_WIDTH-1:0] reg_val;
+    int temp_gpr;
+    // LoongArch has 32 FPRs (F0-F31)
+    // Use MOVGR2FR_D to initialize FPRs with double-precision values
+    for(int i = 0; i < 32; i++) begin
+      // Randomly select a temporary GPR (avoid reserved registers)
+      temp_gpr = $urandom_range(0, 31);
+      while (temp_gpr inside {cfg.sp, cfg.tp, cfg.ra}) begin
+        temp_gpr = $urandom_range(0, 31);
+      end
+      // Generate a random 64-bit value (can be interpreted as double-precision float)
+      `DV_CHECK_STD_RANDOMIZE_WITH_FATAL(reg_val,
+        reg_val dist {
+          'h0                         :/ 1,
+          'h8000_0000_0000_0000        :/ 1,
+          ['h1         : 'hF]         :/ 1,
+          ['h10        : 'hEFFF_FFFF_FFFF_FFFF] :/ 1,
+          ['hF000_0000_0000_0000 : 'hFFFF_FFFF_FFFF_FFFF] :/ 1
+        };)
+      // Load immediate value into GPR
+      str = $sformatf("%0sli.d $r%0d, 0x%0x", indent, temp_gpr, reg_val);
+      instr_stream.push_back(str);
+      // Move from GPR to FPR (double-precision)
+      // LoongArch instruction: movgr2fr.d fd, rj
+      str = $sformatf("%0smovgr2fr.d $f%0d, $r%0d", indent, i, temp_gpr);
       instr_stream.push_back(str);
     end
   endfunction
@@ -1522,87 +1554,87 @@ class riscv_asm_program_gen extends uvm_object;
   // Inject directed instruction stream
   //---------------------------------------------------------------------------------------
 
-  // virtual function void add_directed_instr_stream(string name, int unsigned ratio);
-  //   directed_instr_stream_ratio[name] = ratio;
-  //   `uvm_info(`gfn, $sformatf("Adding directed instruction stream:%0s ratio:%0d/1000", name, ratio),
-  //             UVM_LOW)
-  // endfunction
+  virtual function void add_directed_instr_stream(string name, int unsigned ratio);
+    directed_instr_stream_ratio[name] = ratio;
+    `uvm_info(`gfn, $sformatf("Adding directed instruction stream:%0s ratio:%0d/1000", name, ratio),
+              UVM_LOW)
+  endfunction
 
-  // virtual function void get_directed_instr_stream();
-  //   string args, val;
-  //   string stream_name_opts, stream_freq_opts;
-  //   string stream_name;
-  //   int stream_freq;
-  //   string opts[$];
-  //   for (int i=0; i<cfg.max_directed_instr_stream_seq; i++) begin
-  //     args = $sformatf("directed_instr_%0d=", i);
-  //     stream_name_opts = $sformatf("stream_name_%0d=", i);
-  //     stream_freq_opts = $sformatf("stream_freq_%0d=", i);
-  //     if ($value$plusargs({args,"%0s"}, val)) begin
-  //       uvm_split_string(val, ",", opts);
-  //       if (opts.size() != 2) begin
-  //         `uvm_fatal(`gfn, $sformatf(
-  //           "Incorrect directed instruction format : %0s, expect: name,ratio", val))
-  //       end else begin
-  //         add_directed_instr_stream(opts[0], opts[1].atoi());
-  //       end
-  //     end else if ($value$plusargs({stream_name_opts,"%0s"}, stream_name) &&
-  //                  $value$plusargs({stream_freq_opts,"%0d"}, stream_freq)) begin
-  //       add_directed_instr_stream(stream_name, stream_freq);
-  //     end
-  //   end
-  // endfunction
+  virtual function void get_directed_instr_stream();
+    string args, val;
+    string stream_name_opts, stream_freq_opts;
+    string stream_name;
+    int stream_freq;
+    string opts[$];
+    for (int i=0; i<cfg.max_directed_instr_stream_seq; i++) begin
+      args = $sformatf("directed_instr_%0d=", i);
+      stream_name_opts = $sformatf("stream_name_%0d=", i);
+      stream_freq_opts = $sformatf("stream_freq_%0d=", i);
+      if ($value$plusargs({args,"%0s"}, val)) begin
+        uvm_split_string(val, ",", opts);
+        if (opts.size() != 2) begin
+          `uvm_fatal(`gfn, $sformatf(
+            "Incorrect directed instruction format : %0s, expect: name,ratio", val))
+        end else begin
+          add_directed_instr_stream(opts[0], opts[1].atoi());
+        end
+      end else if ($value$plusargs({stream_name_opts,"%0s"}, stream_name) &&
+                   $value$plusargs({stream_freq_opts,"%0d"}, stream_freq)) begin
+        add_directed_instr_stream(stream_name, stream_freq);
+      end
+    end
+  endfunction
 
   // Generate directed instruction stream based on the ratio setting
-  // virtual function void generate_directed_instr_stream(input int hart,
-  //                                                      input string label,
-  //                                                      input int unsigned original_instr_cnt,
-  //                                                      input int unsigned min_insert_cnt = 0,
-  //                                                      input bit kernel_mode = 0,
-  //                                                      output riscv_instr_stream instr_stream[]);
-  //   uvm_object object_h;
-  //   riscv_rand_instr_stream new_instr_stream;
-  //   int unsigned instr_insert_cnt;
-  //   int unsigned idx;
-  //   uvm_coreservice_t coreservice = uvm_coreservice_t::get();
-  //   uvm_factory factory = coreservice.get_factory();
-  //   if(cfg.no_directed_instr) return;
-  //   foreach(directed_instr_stream_ratio[instr_stream_name]) begin
-  //     instr_insert_cnt = original_instr_cnt * directed_instr_stream_ratio[instr_stream_name] / 1000;
-  //     if(instr_insert_cnt <= min_insert_cnt) begin
-  //       instr_insert_cnt = min_insert_cnt;
-  //     end
-  //     `ifdef DSIM
-  //       // Temporarily skip loop instruction for dsim as it cannot support dynamic array
-  //       // randomization
-  //       if (uvm_is_match("*loop*", instr_stream_name)) begin
-  //         `uvm_info(`gfn, $sformatf("%0s is skipped", instr_stream_name), UVM_LOW)
-  //         continue;
-  //       end
-  //     `endif
-  //     `uvm_info(get_full_name(), $sformatf("Insert directed instr stream %0s %0d/%0d times",
-  //                                instr_stream_name, instr_insert_cnt, original_instr_cnt), UVM_LOW)
-  //     for(int i = 0; i < instr_insert_cnt; i++) begin
-  //       string name = $sformatf("%0s_%0d", instr_stream_name, i);
-  //       object_h = factory.create_object_by_name(instr_stream_name, get_full_name(), name);
-  //       if(object_h == null) begin
-  //         `uvm_fatal(get_full_name(), $sformatf("Cannot create instr stream %0s", name))
-  //       end
-  //       if($cast(new_instr_stream, object_h)) begin
-  //         new_instr_stream.cfg = cfg;
-  //         new_instr_stream.hart = hart;
-  //         new_instr_stream.label = $sformatf("%0s_%0d", label, idx);
-  //         new_instr_stream.kernel_mode = kernel_mode;
-  //         `DV_CHECK_RANDOMIZE_FATAL(new_instr_stream)
-  //         instr_stream = {instr_stream, new_instr_stream};
-  //       end else begin
-  //         `uvm_fatal(get_full_name(), $sformatf("Cannot cast instr stream %0s", name))
-  //       end
-  //       idx++;
-  //     end
-  //   end
-  //   instr_stream.shuffle();
-  // endfunction
+  virtual function void generate_directed_instr_stream(input int hart,
+                                                       input string label,
+                                                       input int unsigned original_instr_cnt,
+                                                       input int unsigned min_insert_cnt = 0,
+                                                       input bit kernel_mode = 0,
+                                                       output riscv_instr_stream instr_stream[]);
+    uvm_object object_h;
+    riscv_rand_instr_stream new_instr_stream;
+    int unsigned instr_insert_cnt;
+    int unsigned idx;
+    uvm_coreservice_t coreservice = uvm_coreservice_t::get();
+    uvm_factory factory = coreservice.get_factory();
+    if(cfg.no_directed_instr) return;
+    foreach(directed_instr_stream_ratio[instr_stream_name]) begin
+      instr_insert_cnt = original_instr_cnt * directed_instr_stream_ratio[instr_stream_name] / 1000;
+      if(instr_insert_cnt <= min_insert_cnt) begin
+        instr_insert_cnt = min_insert_cnt;
+      end
+      `ifdef DSIM
+        // Temporarily skip loop instruction for dsim as it cannot support dynamic array
+        // randomization
+        if (uvm_is_match("*loop*", instr_stream_name)) begin
+          `uvm_info(`gfn, $sformatf("%0s is skipped", instr_stream_name), UVM_LOW)
+          continue;
+        end
+      `endif
+      `uvm_info(get_full_name(), $sformatf("Insert directed instr stream %0s %0d/%0d times",
+                                 instr_stream_name, instr_insert_cnt, original_instr_cnt), UVM_LOW)
+      for(int i = 0; i < instr_insert_cnt; i++) begin
+        string name = $sformatf("%0s_%0d", instr_stream_name, i);
+        object_h = factory.create_object_by_name(instr_stream_name, get_full_name(), name);
+        if(object_h == null) begin
+          `uvm_fatal(get_full_name(), $sformatf("Cannot create instr stream %0s", name))
+        end
+        if($cast(new_instr_stream, object_h)) begin
+          new_instr_stream.cfg = cfg;
+          new_instr_stream.hart = hart;
+          new_instr_stream.label = $sformatf("%0s_%0d", label, idx);
+          new_instr_stream.kernel_mode = kernel_mode;
+          `DV_CHECK_RANDOMIZE_FATAL(new_instr_stream)
+          instr_stream = {instr_stream, new_instr_stream};
+        end else begin
+          `uvm_fatal(get_full_name(), $sformatf("Cannot cast instr stream %0s", name))
+        end
+        idx++;
+      end
+    end
+    instr_stream.shuffle();
+  endfunction
 
   //---------------------------------------------------------------------------------------
   // Generate the debug ROM, and any related programs

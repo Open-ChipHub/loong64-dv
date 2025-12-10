@@ -33,6 +33,14 @@ class riscv_instr_stream extends uvm_object;
   // Some additional reserved floating point registers that should not be used as fd register
   // by this instruction stream
   riscv_fpr_t           reserved_fd[];
+  // User can specify a small group of available FCSR registers (LoongArch: FCSR0~FCSR3)
+  rand riscv_fcsr_t     avail_fcsr[];
+  // Some additional reserved FCSR registers
+  riscv_fcsr_t          reserved_fcsr[];
+  // User can specify a small group of available CFR registers (LoongArch: FCC0~FCC7)
+  rand riscv_cfr_t      avail_cfr[];
+  // Some additional reserved CFR registers
+  riscv_cfr_t           reserved_cfr[];
   int                   hart;
 
   `uvm_object_utils(riscv_instr_stream)
@@ -215,6 +223,28 @@ class riscv_rand_instr_stream extends riscv_instr_stream;
     end
   endfunction
 
+  virtual function void randomize_avail_fcsr();
+    if(avail_fcsr.size() > 0) begin
+      `DV_CHECK_STD_RANDOMIZE_WITH_FATAL(avail_fcsr,
+                                         unique{avail_fcsr};
+                                         foreach(avail_fcsr[i]) {
+                                           !(avail_fcsr[i] inside {reserved_fcsr});
+                                         },
+                                         "Cannot randomize avail_fcsr")
+    end
+  endfunction
+
+  virtual function void randomize_avail_cfr();
+    if(avail_cfr.size() > 0) begin
+      `DV_CHECK_STD_RANDOMIZE_WITH_FATAL(avail_cfr,
+                                         unique{avail_cfr};
+                                         foreach(avail_cfr[i]) {
+                                           !(avail_cfr[i] inside {reserved_cfr});
+                                         },
+                                         "Cannot randomize avail_cfr")
+    end
+  endfunction
+
   function void setup_instruction_dist(bit no_branch = 1'b1, bit no_load_store = 1'b1);
     if (cfg.dist_control_mode) begin
       category_dist = cfg.category_dist;
@@ -272,8 +302,9 @@ class riscv_rand_instr_stream extends riscv_instr_stream;
     riscv_floating_point_instr fp_instr;
     // 检查是否是浮点指令
     if ($cast(fp_instr, instr)) begin
-      // 浮点指令：随机化浮点寄存器
+      // 浮点指令：随机化浮点寄存器（FPR, FCSR, CFR）
       `DV_CHECK_RANDOMIZE_WITH_FATAL(fp_instr,
+        // FPR 约束
         if (avail_fprs.size() > 0) {
           if (has_fs1) {
             fs1 inside {avail_fprs};
@@ -291,6 +322,28 @@ class riscv_rand_instr_stream extends riscv_instr_stream;
         foreach (reserved_fd[i]) {
           if (has_fd) {
             fd != reserved_fd[i];
+          }
+        }
+        // FCSR 约束（LoongArch: FCSR0~FCSR3）
+        if (avail_fcsr.size() > 0) {
+          if (has_fcsr) {
+            fcsr inside {avail_fcsr};
+          }
+        }
+        foreach (reserved_fcsr[i]) {
+          if (has_fcsr) {
+            fcsr != reserved_fcsr[i];
+          }
+        }
+        // CFR 约束（LoongArch: FCC0~FCC7）
+        if (avail_cfr.size() > 0) {
+          if (has_cfr) {
+            cfr inside {avail_cfr};
+          }
+        }
+        foreach (reserved_cfr[i]) {
+          if (has_cfr) {
+            cfr != reserved_cfr[i];
           }
         }
       )

@@ -19,8 +19,12 @@ class riscv_floating_point_instr extends riscv_instr;
   bit              has_cfr = 1'b0;   // 默认不使用CFR
 
   `uvm_object_utils(riscv_floating_point_instr)
-  `uvm_object_new
-
+	
+  function new (string name = "");
+	super.new(name);
+	is_floating_point = 1;
+  endfunction
+	
   // Convert the instruction to assembly code
   virtual function string convert2asm(string prefix = "");
     string asm_str;
@@ -88,7 +92,7 @@ class riscv_floating_point_instr extends riscv_instr;
           bit [4:0] cond_val = imm[4:0];  // cond 是5位立即数（0x0-0x19）
           string cond_str = get_fcmp_cond_str(cond_val);
           string precision = (instr_name == FCMP_S) ? "s" : "d";
-          asm_str = $sformatf("%0s.%0s.%0s $fcc%0d, $%0s, $%0s", asm_str, cond_str, precision, cfr, fs1.name(), fs2.name());
+		  asm_str = $sformatf("fcmp.%0s.%0s $fcc%0d, $%0s, $%0s", cond_str, precision, cfr, fs1.name(), fs2.name());
         end
         // 浮点加载/存储指令（索引寻址）：fd, rj, rk (FPR，GPR基址，GPR索引)
         else if (instr_name inside {FLDX_S, FLDX_D, FSTX_S, FSTX_D}) begin
@@ -363,6 +367,17 @@ class riscv_floating_point_instr extends riscv_instr;
     this.has_cfr = rhs_.has_cfr;
   endfunction : do_copy
 
+  // 重写 extend_imm() 函数，确保 FCMP 指令的条件码不被修改
+  virtual function void extend_imm();
+    // 对于 FCMP 指令，条件码是 5 位无符号值，不应该被符号扩展
+    if (instr_name inside {FCMP_S, FCMP_D}) begin
+      // 只保留低 5 位，高位清零
+      imm[XLEN-1:5] = 0;
+      return;
+    end
+    super.extend_imm();
+  endfunction : extend_imm
+	
   virtual function void set_imm_len();
     if (instr_name inside {BCEQZ, BCNEZ}) begin
       // BCEQZ/BCNEZ指令：21位偏移量

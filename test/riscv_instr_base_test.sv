@@ -87,7 +87,7 @@ class riscv_instr_base_test extends uvm_test;
       // riscv_csr_instr::create_csr_filter(cfg);
       asm_gen = riscv_asm_program_gen::type_id::create("asm_gen", , `gfn);
       asm_gen.cfg = cfg;
-      // asm_gen.get_directed_instr_stream();
+      asm_gen.get_directed_instr_stream();
       test_name = $sformatf("%0s_%0d.S", asm_file_name, i+start_idx);
       // apply_directed_instr();
       `uvm_info(`gfn, "All directed instruction is applied", UVM_LOW)
