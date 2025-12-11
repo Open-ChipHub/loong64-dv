@@ -250,7 +250,7 @@ package riscv_instr_pkg;
     STPTR_D,
     PRELD,
     PRELDX,
-	// 边界检查访存指令
+	  // 边界检查访存指令
     LDGT_B,
     LDGT_H,
     LDGT_W,
@@ -267,7 +267,7 @@ package riscv_instr_pkg;
     STLE_H,
     STLE_W,
     STLE_D,
-	// 原子访存指令
+	  // 原子访存指令
     AMSWAP_W,
     AMSWAP_D,
     AMADD_W,
@@ -304,35 +304,35 @@ package riscv_instr_pkg;
     AMMAX_DB_DU,
     AMMIN_DB_WU,
     AMMIN_DB_DU,
-	AMSWAP_DB_B,
+	  AMSWAP_DB_B,
     AMSWAP_DB_H,
     AMADD_DB_B,
     AMADD_DB_H,
-	AMSWAP_B,
+	  AMSWAP_B,
     AMSWAP_H,
-	AMADD_B,
+	  AMADD_B,
     AMADD_H,
-	AMCAS_B,
+	  AMCAS_B,
     AMCAS_H,
     AMCAS_W,
     AMCAS_D,
-	AMCAS_DB_B,
+	  AMCAS_DB_B,
     AMCAS_DB_H,
     AMCAS_DB_W,
     AMCAS_DB_D,
-	SC_Q,
-	LL_W,
+	  SC_Q,
+	  LL_W,
     LL_D,
     SC_W,
     SC_D,
-	LL_ACQ_W,
+	  LL_ACQ_W,
     LL_ACQ_D,
     SC_REL_W,
     SC_REL_D,
-	// 栅障指令
-	//DBAR,
-	//IBAR,
-	// CRC校验指令
+	  // 栅障指令
+	  //DBAR,
+	  //IBAR,
+	  // CRC校验指令
     CRC_W_B_W,
     CRC_W_H_W,
     CRC_W_W_W,
@@ -341,7 +341,7 @@ package riscv_instr_pkg;
     CRCC_W_H_W,
     CRCC_W_W_W,
     CRCC_W_D_W,
-	// 浮点指令
+	  // 浮点指令
     FADD_S,
     FSUB_S,
     FMUL_S,
@@ -412,6 +412,26 @@ package riscv_instr_pkg;
     F0, F1, F2, F3, F4, F5, F6, F7, F8, F9, F10, F11, F12, F13, F14, F15,
     F16, F17, F18, F19, F20, F21, F22, F23, F24, F25, F26, F27, F28, F29, F30, F31
   } riscv_fpr_t;
+	
+  // LoongArch 浮点控制状态寄存器（FCSR）
+  typedef enum bit [1:0] {  
+    FCSR0 = 2'b00,  // 完整的FCSR寄存器
+    FCSR1 = 2'b01,  // Enables域的别名（fcsr0[4:0]）
+    FCSR2 = 2'b10,  // Cause和Flags域的别名（fcsr0[28:24]和[20:16]）
+    FCSR3 = 2'b11   // RM域的别名（fcsr0[9:8]）
+  } riscv_fcsr_t;
+
+  // LoongArch 条件标志寄存器（CFR）
+  typedef enum bit [2:0] {  
+    FCC0 = 3'b000,
+    FCC1 = 3'b001,
+    FCC2 = 3'b010,
+    FCC3 = 3'b011,
+    FCC4 = 3'b100,
+    FCC5 = 3'b101,
+    FCC6 = 3'b110,
+    FCC7 = 3'b111
+  } riscv_cfr_t;
 
   typedef enum bit [4:0] {
     V0, V1, V2, V3, V4, V5, V6, V7, V8, V9, V10, V11, V12, V13, V14, V15,

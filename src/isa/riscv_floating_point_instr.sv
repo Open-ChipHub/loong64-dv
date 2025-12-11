@@ -13,6 +13,8 @@ class riscv_floating_point_instr extends riscv_instr;
   bit              has_fs2 = 1'b1;
   bit              has_fs3 = 1'b0;
   bit              has_fd  = 1'b1;
+  bit              has_fcsr = 1'b0;  // 默认不使用FCSR
+  bit              has_cfr = 1'b0;   // 默认不使用CFR
 
   `uvm_object_utils(riscv_floating_point_instr)
   `uvm_object_new
@@ -80,10 +82,15 @@ class riscv_floating_point_instr extends riscv_instr;
 
   function void pre_randomize();
     super.pre_randomize();
+    // For GPR-to-FPR move instructions, rs1 (GPR) is used
+    // For FPR-to-GPR move instructions, rd (GPR) is used
+    // These are already handled in set_rand_mode() and super.pre_randomize()
     fs1.rand_mode(has_fs1);
     fs2.rand_mode(has_fs2);
     fs3.rand_mode(has_fs3);
     fd.rand_mode(has_fd);
+    fcsr.rand_mode(has_fcsr);
+    cfr.rand_mode(has_cfr);
   endfunction
 
   virtual function void do_copy(uvm_object rhs);

@@ -117,6 +117,9 @@ class riscv_instr extends uvm_object;
       instr_inst = create_instr(instr_name);
       instr_template[instr_name] = instr_inst;
       if (!instr_inst.is_supported(cfg)) continue;
+	
+	  // Filter floating point instructions if disabled
+      if (!cfg.enable_floating_point && instr_inst.is_floating_point) continue;
 
       if (instr_inst.group inside {supported_isa}) begin
         instr_category[instr_inst.category].push_back(instr_name);
