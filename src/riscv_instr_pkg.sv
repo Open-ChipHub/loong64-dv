@@ -585,7 +585,9 @@ package riscv_instr_pkg;
 
   //Pseudo instructions
   typedef enum bit [7:0] {
-    PSEUDO_NONE = 0 // 占位，暂时无伪指令；不允许空的enum
+    //PSEUDO_NONE = 0 // 占位，暂时无伪指令；不允许空的enum
+	LI = 0,
+    LA
   } riscv_pseudo_instr_name_t;
 
   // Data pattern of the memory model
@@ -1016,7 +1018,7 @@ package riscv_instr_pkg;
   `include "isa/la64i_instr.sv"
   `include "isa/la64f_instr.sv"
 
-  // `include "riscv_pseudo_instr.sv"
+  `include "riscv_pseudo_instr.sv"
   // `include "riscv_illegal_instr.sv"
   // `include "riscv_reg.sv"   // 疑似给CSR寄存器用的
   // `include "riscv_privil_reg.sv"
@@ -1026,12 +1028,12 @@ package riscv_instr_pkg;
   // `include "riscv_page_table_list.sv"
   // `include "riscv_privileged_common_seq.sv"
   // `include "riscv_callstack_gen.sv"   // 生成带“子程序/函数调用”的测试，如果只产生线性指令流不需要
-  // `include "riscv_data_page_gen.sv"   // 生成可直接拼到汇编里的数据节(.section)字符串，为加载/存储/AMO/权限相关用例提供可控的内存初始内容与分段布局，覆盖对齐、边界与不同访问权限场景。
+  `include "riscv_data_page_gen.sv"   // 生成可直接拼到汇编里的数据节(.section)字符串，为加载/存储/AMO/权限相关用例提供可控的内存初始内容与分段布局，覆盖对齐、边界与不同访问权限场景。
 
   `include "riscv_instr_stream.sv"    // 构造、操作和随机化一段基础指令序列，随机指令序列生成与拼装的核心基类
   // `include "riscv_loop_instr.sv"    // 用于在 riscv-dv 中构造带后向分支的单/双层嵌套循环并把它们混入随机指令流
-  // `include "riscv_directed_instr_lib.sv"    // “定向指令流库”，提供一组可直接插入程序的场景化指令序列类，如跳转链、入栈/出栈、定向内存访问、数值角落值等
-  // `include "riscv_load_store_instr_lib.sv"    // 用于在riscv-dv中系统性生成各类访存场景，覆盖对齐/未对齐、压缩指令、浮点/向量访存、地址局部性与数据相关/结构相关冒险等。
+  `include "riscv_directed_instr_lib.sv"    // “定向指令流库”，提供一组可直接插入程序的场景化指令序列类，如跳转链、入栈/出栈、定向内存访问、数值角落值等
+  `include "riscv_load_store_instr_lib.sv"    // 用于在riscv-dv中系统性生成各类访存场景，覆盖对齐/未对齐、压缩指令、浮点/向量访存、地址局部性与数据相关/结构相关冒险等。
   // `include "riscv_amo_instr_lib.sv"   // “原子内存操作(AMO)指令流库”，用于在riscv-dv中生成面向AMO/LR-SC/向量AMO的定向场景指令序列。
 
   `include "riscv_instr_sequence.sv"

@@ -26,7 +26,7 @@
 class riscv_asm_program_gen extends uvm_object;
 
    riscv_instr_gen_config              cfg;
-   // riscv_data_page_gen                 data_page_gen;
+   riscv_data_page_gen                 data_page_gen;
    // User mode programs
    riscv_instr_sequence                main_program[NUM_HARTS];
    riscv_instr_sequence                sub_program[NUM_HARTS][];
@@ -70,6 +70,13 @@ class riscv_asm_program_gen extends uvm_object;
     instr_stream.delete();
     // Generate program header
     // gen_program_header();
+    // Add _start entry point for LA64 (pointing to h0_start)
+    // Use B (branch) instruction to jump directly to h0_start
+    instr_stream.push_back(".globl _start");
+    instr_stream.push_back(".section .text");
+    instr_stream.push_back("_start:");
+    instr_stream.push_back("b h0_start");
+    instr_stream.push_back("");
     for (int hart = 0; hart < cfg.num_of_harts; hart++) begin
       // string sub_program_name[$];
       instr_stream.push_back($sformatf("h%0d_start:", hart));
@@ -106,10 +113,10 @@ class riscv_asm_program_gen extends uvm_object;
       main_program[hart].is_debug_program = 0;
       main_program[hart].label_name = main_program[hart].get_name();
       generate_directed_instr_stream(.hart(hart),
-                                     .label(main_program[hart].label_name),
-                                     .original_instr_cnt(main_program[hart].instr_cnt),
-                                     .min_insert_cnt(1),
-                                     .instr_stream(main_program[hart].directed_instr));
+                                      .label(main_program[hart].label_name),
+                                      .original_instr_cnt(main_program[hart].instr_cnt),
+                                      .min_insert_cnt(1),
+                                      .instr_stream(main_program[hart].directed_instr));
       main_program[hart].cfg = cfg;
       `DV_CHECK_RANDOMIZE_FATAL(main_program[hart])
       main_program[hart].gen_instr(.is_main_program(1), .no_branch(cfg.no_branch_jump));
@@ -147,28 +154,28 @@ class riscv_asm_program_gen extends uvm_object;
       // end
       gen_section({hart_prefix(hart), "instr_end"}, {"nop"});
     end
-    // for (int hart = 0; hart < cfg.num_of_harts; hart++) begin
-    //   // Starting point of data section
-    //   gen_data_page_begin(hart);
-    //   if(!cfg.no_data_page) begin
-    //     // User data section
-    //     gen_data_page(hart);
-    //     // AMO memory region
-    //     if ((hart == 0) && (RV32A inside {supported_isa})) begin
-    //       gen_data_page(hart, .amo(1));
-    //     end
-    //   end
-    //   // Stack section
-    //   gen_stack_section(hart);
-    //   if (!cfg.bare_program_mode) begin
-    //     // Generate kernel program/data/stack section
-    //     gen_kernel_sections(hart);
-    //   end
-    //   // Page table
-    //   if (!cfg.bare_program_mode) begin
-    //     gen_page_table_section(hart);
-    //   end
-    // end
+    for (int hart = 0; hart < cfg.num_of_harts; hart++) begin
+      // Starting point of data section
+      gen_data_page_begin(hart);
+      if(!cfg.no_data_page) begin
+        // User data section
+        gen_data_page(hart);
+        // AMO memory region (LA64 doesn't use RV32A, but keep for compatibility)
+        // if ((hart == 0) && (RV32A inside {supported_isa})) begin
+        //   gen_data_page(hart, .amo(1));
+        // end
+      end
+      // Stack section
+      // gen_stack_section(hart);
+      // if (!cfg.bare_program_mode) begin
+      //   // Generate kernel program/data/stack section
+      //   gen_kernel_sections(hart);
+      // end
+      // Page table
+      // if (!cfg.bare_program_mode) begin
+      //   gen_page_table_section(hart);
+      // end
+    end
   endfunction
 
   //---------------------------------------------------------------------------------------
@@ -348,21 +355,22 @@ class riscv_asm_program_gen extends uvm_object;
   //   end
   // endfunction
 
-  // virtual function void gen_data_page_begin(int hart);
-  //   instr_stream.push_back(".section .data");
-  //   if (hart == 0) begin
-  //     instr_stream.push_back(".align 6; .global tohost; tohost: .dword 0;");
-  //     instr_stream.push_back(".align 6; .global fromhost; fromhost: .dword 0;");
-  //   end
-  // endfunction
+  virtual function void gen_data_page_begin(int hart);
+    // For LA64, we don't need tohost/fromhost, but keep data section
+    // instr_stream.push_back(".section .data");
+    // if (hart == 0) begin
+    //   instr_stream.push_back(".align 6; .global tohost; tohost: .dword 0;");
+    //   instr_stream.push_back(".align 6; .global fromhost; fromhost: .dword 0;");
+    // end
+  endfunction
 
-  // virtual function void gen_data_page(int hart, bit is_kernel = 1'b0, bit amo = 0);
-  //   string data_page;
-  //   data_page_gen = riscv_data_page_gen::type_id::create("data_page_gen");
-  //   data_page_gen.cfg = cfg;
-  //   data_page_gen.gen_data_page(hart, cfg.data_page_pattern, is_kernel, amo);
-  //   instr_stream = {instr_stream, data_page_gen.data_page_str};
-  // endfunction
+  virtual function void gen_data_page(int hart, bit is_kernel = 1'b0, bit amo = 0);
+    string data_page;
+    data_page_gen = riscv_data_page_gen::type_id::create("data_page_gen");
+    data_page_gen.cfg = cfg;
+    data_page_gen.gen_data_page(hart, cfg.data_page_pattern, is_kernel, amo);
+    instr_stream = {instr_stream, data_page_gen.data_page_str};
+  endfunction
 
   // Generate the user stack section
   // virtual function void gen_stack_section(int hart);
@@ -541,38 +549,6 @@ class riscv_asm_program_gen extends uvm_object;
     end
   endfunction
 
-  // Initialize floating point general purpose registers (LoongArch)
-  virtual function void init_floating_point_gpr();
-    string str;
-    bit [DATA_WIDTH-1:0] reg_val;
-    int temp_gpr;
-    // LoongArch has 32 FPRs (F0-F31)
-    // Use MOVGR2FR_D to initialize FPRs with double-precision values
-    for(int i = 0; i < 32; i++) begin
-      // Randomly select a temporary GPR (avoid reserved registers)
-      temp_gpr = $urandom_range(0, 31);
-      while (temp_gpr inside {cfg.sp, cfg.tp, cfg.ra}) begin
-        temp_gpr = $urandom_range(0, 31);
-      end
-      // Generate a random 64-bit value (can be interpreted as double-precision float)
-      `DV_CHECK_STD_RANDOMIZE_WITH_FATAL(reg_val,
-        reg_val dist {
-          'h0                         :/ 1,
-          'h8000_0000_0000_0000        :/ 1,
-          ['h1         : 'hF]         :/ 1,
-          ['h10        : 'hEFFF_FFFF_FFFF_FFFF] :/ 1,
-          ['hF000_0000_0000_0000 : 'hFFFF_FFFF_FFFF_FFFF] :/ 1
-        };)
-      // Load immediate value into GPR
-      str = $sformatf("%0sli.d $r%0d, 0x%0x", indent, temp_gpr, reg_val);
-      instr_stream.push_back(str);
-      // Move from GPR to FPR (double-precision)
-      // LoongArch instruction: movgr2fr.d fd, rj
-      str = $sformatf("%0smovgr2fr.d $f%0d, $r%0d", indent, i, temp_gpr);
-      instr_stream.push_back(str);
-    end
-  endfunction
-
   // Initialize vector general purpose registers
   // virtual function void init_vec_gpr();
   //   int SEW;
@@ -629,20 +605,37 @@ class riscv_asm_program_gen extends uvm_object;
   //   endcase
   // endfunction
 
-  // Initialize floating point general purpose registers
-  // virtual function void init_floating_point_gpr();
-  //   int int_gpr;
-  //   string str;
-  //   for(int i = 0; i < NUM_FLOAT_GPR; i++) begin
-  //     randcase
-  //       1: init_floating_point_gpr_with_spf(i);
-  //       RV64D inside {supported_isa}: init_floating_point_gpr_with_dpf(i);
-  //     endcase
-  //   end
-  //   // Initialize rounding mode of FCSR
-  //   str = $sformatf("%0sfsrmi %0d", indent, cfg.fcsr_rm);
-  //   instr_stream.push_back(str);
-  // endfunction
+  // Initialize floating point general purpose registers (LoongArch)
+  virtual function void init_floating_point_gpr();
+    string str;
+    bit [DATA_WIDTH-1:0] reg_val;
+    int temp_gpr;
+    // LoongArch has 32 FPRs (F0-F31)
+    // Use MOVGR2FR_D to initialize FPRs with double-precision values
+    for(int i = 0; i < 32; i++) begin
+      // Randomly select a temporary GPR (avoid reserved registers)
+      temp_gpr = $urandom_range(0, 31);
+      while (temp_gpr inside {cfg.sp, cfg.tp, cfg.ra}) begin
+        temp_gpr = $urandom_range(0, 31);
+      end
+      // Generate a random 64-bit value (can be interpreted as double-precision float)
+      `DV_CHECK_STD_RANDOMIZE_WITH_FATAL(reg_val,
+        reg_val dist {
+          'h0                         :/ 1,
+          'h8000_0000_0000_0000        :/ 1,
+          ['h1         : 'hF]         :/ 1,
+          ['h10        : 'hEFFF_FFFF_FFFF_FFFF] :/ 1,
+          ['hF000_0000_0000_0000 : 'hFFFF_FFFF_FFFF_FFFF] :/ 1
+        };)
+      // Load immediate value into GPR
+      str = $sformatf("%0sli.d $r%0d, 0x%0x", indent, temp_gpr, reg_val);
+      instr_stream.push_back(str);
+      // Move from GPR to FPR (double-precision)
+      // LoongArch instruction: movgr2fr.d fd, rj
+      str = $sformatf("%0smovgr2fr.d $f%0d, $r%0d", indent, i, temp_gpr);
+      instr_stream.push_back(str);
+    end
+  endfunction
 
   // get instructions initialize floating_point_gpr with single precision floating value
   // virtual function void init_floating_point_gpr_with_spf(int int_floating_gpr);
@@ -1468,9 +1461,17 @@ class riscv_asm_program_gen extends uvm_object;
   // Write the generated program to a file
   function void gen_test_file(string test_name);
     int fd;
+    string lines[$];
     fd = $fopen(test_name,"w");
     foreach(instr_stream[i]) begin
-      $fwrite(fd, {instr_stream[i],"\n"});
+      // Split string by newline to handle multi-line instructions (e.g., la pseudo-instruction)
+      uvm_split_string(instr_stream[i], "\n", lines);
+      foreach(lines[j]) begin
+        if(lines[j] != "") begin
+          // Use %s format specifier to safely write strings (avoids treating special chars as format specifiers)
+          $fwrite(fd, "%s\n", lines[j]);
+        end
+      end
     end
     $fclose(fd);
     `uvm_info(get_full_name(), $sformatf("%0s is generated", test_name), UVM_LOW)

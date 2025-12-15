@@ -117,9 +117,6 @@ class riscv_jump_instr extends riscv_directed_instr_stream;
     !(gpr inside {cfg.reserved_regs, ZERO});
     imm inside {[-1023:1023]};
     mixed_instr_cnt inside {[5:10]};
-    if (jump.instr_name inside {C_JR, C_JALR}) {
-      imm == 0;
-    }
   }
 
   `uvm_object_utils(riscv_jump_instr)
@@ -131,13 +128,11 @@ class riscv_jump_instr extends riscv_directed_instr_stream;
 
   function void pre_randomize();
     if (use_jalr) begin
-      jump = riscv_instr::get_instr(JALR);
-    end else if (cfg.disable_compressed_instr || (cfg.ra != RA)) begin
-      jump = riscv_instr::get_rand_instr(.include_instr({JAL, JALR}));
+      jump = riscv_instr::get_instr(JIRL);
     end else begin
-      jump = riscv_instr::get_rand_instr(.include_instr({JAL, JALR, C_JALR}));
+      jump = riscv_instr::get_rand_instr(.include_instr({BL, JIRL}));
     end
-    addi = riscv_instr::get_instr(ADDI);
+    addi = riscv_instr::get_instr(ADDI_D);
     branch = riscv_instr::get_rand_instr(.include_instr({BEQ, BNE, BLT, BGE, BLTU, BGEU}));
   endfunction
 
@@ -159,8 +154,8 @@ class riscv_jump_instr extends riscv_directed_instr_stream;
     reserved_rd = {gpr};
     initialize_instr_list(mixed_instr_cnt);
     gen_instr(1'b1);
-    if (jump.instr_name inside {JALR, C_JALR}) begin
-      // JALR is expected to set lsb to 0
+    if (jump.instr_name == JIRL) begin
+      // JIRL is expected to set lsb to 0
       int offset = $urandom_range(0, 1);
       addi.imm_str = $sformatf("%0d", imm + offset);
     end else begin
@@ -177,10 +172,10 @@ class riscv_jump_instr extends riscv_directed_instr_stream;
     // The purse of adding the branch instruction here is to cover branch -> jump scenario.
     if(enable_branch) instr = {branch};
     // Restore stack before unconditional jump
-    if((jump.rd == ZERO) || (jump.instr_name == C_JR)) begin
+    if(jump.rd == ZERO) begin
       instr= {stack_exit_instr, instr};
     end
-    if(jump.instr_name == JAL) begin
+    if(jump.instr_name == BL) begin
       jump.imm_str = target_program_label;
     end else begin
       instr = {la, addi, instr};
@@ -228,15 +223,9 @@ class riscv_jal_instr extends riscv_rand_instr_stream;
     end
     order.shuffle();
     setup_allowed_instr(1, 1);
-    jal = {JAL};
-    if (!cfg.disable_compressed_instr) begin
-      jal.push_back(C_J);
-      if (XLEN == 32) begin
-        jal.push_back(C_JAL);
-      end
-    end
+    jal = {BL};
     // First instruction
-    jump_start = riscv_instr::get_instr(JAL);
+    jump_start = riscv_instr::get_instr(BL);
     `DV_CHECK_RANDOMIZE_WITH_FATAL(jump_start, rd == cfg.ra;)
     jump_start.imm_str = $sformatf("%0df", order[0]);
     jump_start.label = label;
@@ -247,7 +236,7 @@ class riscv_jal_instr extends riscv_rand_instr_stream;
       jump[i] = riscv_instr::get_rand_instr(.include_instr({jal}));
       `DV_CHECK_RANDOMIZE_WITH_FATAL(jump[i],
         if (has_rd) {
-          rd dist {RA := 5, T1 := 2, [SP:T0] :/ 1, [T2:T6] :/ 2};
+          rd dist {R1 := 5, R12 := 2, [R2:R4] :/ 1, [R13:R20] :/ 2};
           !(rd inside {cfg.reserved_regs});
         }
       )
@@ -313,20 +302,20 @@ class riscv_push_stack_instr extends riscv_rand_instr_stream;
                             create($sformatf("push_stack_instr_%0d", i));
     end
     // addi sp,sp,-imm
-    push_stack_instr[0] = riscv_instr::get_instr(ADDI);
+    push_stack_instr[0] = riscv_instr::get_instr(ADDI_D);
     `DV_CHECK_RANDOMIZE_WITH_FATAL(push_stack_instr[0],
                                    rd == cfg.sp; rs1 == cfg.sp;
                                    imm == (~stack_len + 1);)
     push_stack_instr[0].imm_str = $sformatf("-%0d", stack_len);
     foreach(saved_regs[i]) begin
       if(XLEN == 32) begin
-        push_stack_instr[i+1] = riscv_instr::get_instr(SW);
+        push_stack_instr[i+1] = riscv_instr::get_instr(ST_W);
         `DV_CHECK_RANDOMIZE_WITH_FATAL(push_stack_instr[i+1],
           rs2 == saved_regs[i]; rs1 == cfg.sp; imm == 4 * (i+1);)
       end else begin
-        push_stack_instr[i+1] = riscv_instr::get_instr(SD);
+        push_stack_instr[i+1] = riscv_instr::get_instr(ST_D);
         `DV_CHECK_RANDOMIZE_WITH_FATAL(push_stack_instr[i+1],
-          instr_name == SD; rs2 == saved_regs[i]; rs1 == cfg.sp; imm == 8 * (i+1);)
+          instr_name == ST_D; rs2 == saved_regs[i]; rs1 == cfg.sp; imm == 8 * (i+1);)
       end
       push_stack_instr[i+1].process_load_store = 0;
     end
@@ -392,18 +381,18 @@ class riscv_pop_stack_instr extends riscv_rand_instr_stream;
     end
     foreach(saved_regs[i]) begin
       if(XLEN == 32) begin
-        pop_stack_instr[i] = riscv_instr::get_instr(LW);
+        pop_stack_instr[i] = riscv_instr::get_instr(LD_W);
         `DV_CHECK_RANDOMIZE_WITH_FATAL(pop_stack_instr[i],
           rd == saved_regs[i]; rs1 == cfg.sp; imm == 4 * (i+1);)
       end else begin
-        pop_stack_instr[i] = riscv_instr::get_instr(LD);
+        pop_stack_instr[i] = riscv_instr::get_instr(LD_D);
         `DV_CHECK_RANDOMIZE_WITH_FATAL(pop_stack_instr[i],
           rd == saved_regs[i]; rs1 == cfg.sp; imm == 8 * (i+1);)
       end
       pop_stack_instr[i].process_load_store = 0;
     end
     // addi sp,sp,imm
-    pop_stack_instr[num_of_reg_to_save] = riscv_instr::get_instr(ADDI);
+    pop_stack_instr[num_of_reg_to_save] = riscv_instr::get_instr(ADDI_D);
     `DV_CHECK_RANDOMIZE_WITH_FATAL(pop_stack_instr[num_of_reg_to_save],
                                    rd == cfg.sp; rs1 == cfg.sp; imm == stack_len;)
     pop_stack_instr[num_of_reg_to_save].imm_str = $sformatf("%0d", stack_len);
