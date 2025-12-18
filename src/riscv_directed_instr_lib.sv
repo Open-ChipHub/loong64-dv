@@ -226,7 +226,8 @@ class riscv_jal_instr extends riscv_rand_instr_stream;
     jal = {BL};
     // First instruction
     jump_start = riscv_instr::get_instr(BL);
-    `DV_CHECK_RANDOMIZE_WITH_FATAL(jump_start, rd == cfg.ra;)
+	jump_start.m_cfg = cfg;
+	jump_start.rd = cfg.ra;
     jump_start.imm_str = $sformatf("%0df", order[0]);
     jump_start.label = label;
     // Last instruction
