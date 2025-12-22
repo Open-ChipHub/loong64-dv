@@ -45,14 +45,14 @@ class riscv_load_store_base_instr_stream extends riscv_mem_access_stream;
   }
 
   constraint sp_c {
-    use_sp_as_rs1 dist {1 := 1, 0 := 2};
-    if (use_sp_as_rs1) {
-      rs1_reg == SP;
-    }
+    // LA64: do not use stack pointer as base for directed load/store
+    use_sp_as_rs1 == 1'b0;
   }
 
   constraint rs1_c {
     !(rs1_reg inside {cfg.reserved_regs, reserved_rd, ZERO});
+    // Explicitly forbid tp (R2) and sp (R3) as base registers to avoid invalid ranges
+    !(rs1_reg inside {R2, R3});
   }
 
   constraint addr_c {
@@ -65,6 +65,13 @@ class riscv_load_store_base_instr_stream extends riscv_mem_access_stream;
       }
     }
     base inside {[0 : max_load_store_offset-1]};
+    // LA64: Ensure base address leaves enough margin for maximum offset to avoid boundary issues
+    // Leave at least 4KB margin at the end of region to accommodate maximum offset (2048)
+    // This ensures final address (region_base + base + offset) stays within region bounds
+    (max_load_store_offset > 4096) -> (base < (max_load_store_offset - 4096));
+	if (data_page_id == 1) { 
+	base < 150 * 1024;
+    }
   }
 
   function new(string name = "");
@@ -88,6 +95,17 @@ class riscv_load_store_base_instr_stream extends riscv_mem_access_stream;
         }
         addr_ == base + offset_;
         addr_ inside {[0 : max_load_store_offset - 1]};
+        // LA64: Additional constraint for LA_EMU address range
+        // Valid RAM ranges: [0, 0x10000000), [0x90000000, ram_size+0x80000000), [0x1c000000, 0x1e000000)
+        // Ensure final address (region_base + base + offset) stays within valid range
+        // Since region symbols are in data section starting at 0x90000000+, we need to ensure
+        // base + offset doesn't cause address to go beyond reasonable limits
+        // Conservative approach: limit offset based on base to avoid boundary issues
+        // Use if-else constraint expressions (without begin-end)
+        if (base > (max_load_store_offset - 4096))
+          soft offset_ inside {[-256:255]};
+        else if (base > (max_load_store_offset - 65536))
+          soft offset_ inside {[-512:511]};
       }) begin
         `uvm_fatal(`gfn, "Cannot randomize load/store offset")
       end
@@ -98,7 +116,7 @@ class riscv_load_store_base_instr_stream extends riscv_mem_access_stream;
 
   function void pre_randomize();
     super.pre_randomize();
-    if (SP inside {cfg.reserved_regs, reserved_rd}) begin
+    if (R2 inside {cfg.reserved_regs, reserved_rd}) begin
       use_sp_as_rs1 = 0;
       use_sp_as_rs1.rand_mode(0);
       sp_rnd_order_c.constraint_mode(0);
@@ -119,80 +137,42 @@ class riscv_load_store_base_instr_stream extends riscv_mem_access_stream;
 
   // Generate each load/store instruction
   virtual function void gen_load_store_instr();
-    bit enable_compressed_load_store;
     riscv_instr instr;
     randomize_avail_regs();
-    if ((rs1_reg inside {[S0 : A5], SP}) && !cfg.disable_compressed_instr) begin
-      enable_compressed_load_store = 1;
-    end
     foreach (addr[i]) begin
       // Assign the allowed load/store instructions based on address alignment
       // This is done separately rather than a constraint to improve the randomization performance
-      allowed_instr = {LB, LBU, SB};
+      // LA64 load/store instructions
+      allowed_instr = {LD_B, LD_BU, ST_B};
       if (!cfg.enable_unaligned_load_store) begin
         if (addr[i][0] == 1'b0) begin
-          allowed_instr = {LH, LHU, SH, allowed_instr};
+          allowed_instr = {LD_H, LD_HU, ST_H, allowed_instr};
         end
         if (addr[i] % 4 == 0) begin
-          allowed_instr = {LW, SW, allowed_instr};
+          allowed_instr = {LD_W, LD_WU, ST_W, allowed_instr};
           if (cfg.enable_floating_point) begin
-            allowed_instr = {FLW, FSW, allowed_instr};
-          end
-          if((offset[i] inside {[0:127]}) && (offset[i] % 4 == 0) &&
-             (RV32C inside {riscv_instr_pkg::supported_isa}) &&
-             enable_compressed_load_store) begin
-            if (rs1_reg == SP) begin
-              `uvm_info(`gfn, "Add LWSP/SWSP to allowed instr", UVM_LOW)
-              allowed_instr = {C_LWSP, C_SWSP};
-            end else begin
-              allowed_instr = {C_LW, C_SW, allowed_instr};
-              if (cfg.enable_floating_point && (RV32FC inside {supported_isa})) begin
-                allowed_instr = {C_FLW, C_FSW, allowed_instr};
-              end
-            end
+            allowed_instr = {FLD_S, FST_S, allowed_instr};
           end
         end
         if ((XLEN >= 64) && (addr[i] % 8 == 0)) begin
-          allowed_instr = {LWU, LD, SD, allowed_instr};
-          if (cfg.enable_floating_point && (RV32D inside {supported_isa})) begin
-            allowed_instr = {FLD, FSD, allowed_instr};
-          end
-          if((offset[i] inside {[0:255]}) && (offset[i] % 8 == 0) &&
-             (RV64C inside {riscv_instr_pkg::supported_isa} &&
-             enable_compressed_load_store)) begin
-            if (rs1_reg == SP) begin
-              allowed_instr = {C_LDSP, C_SDSP};
-            end else begin
-              allowed_instr = {C_LD, C_SD, allowed_instr};
-              if (cfg.enable_floating_point && (RV32DC inside {supported_isa})) begin
-                allowed_instr = {C_FLD, C_FSD, allowed_instr};
-              end
-            end
+          allowed_instr = {LD_D, ST_D, allowed_instr};
+          if (cfg.enable_floating_point) begin
+            allowed_instr = {FLD_D, FST_D, allowed_instr};
           end
         end
       end else begin // unaligned load/store
-        allowed_instr = {LW, SW, LH, LHU, SH, allowed_instr};
-        // Compressed load/store still needs to be aligned
-        if ((offset[i] inside {[0:127]}) && (offset[i] % 4 == 0) &&
-            (RV32C inside {riscv_instr_pkg::supported_isa}) &&
-            enable_compressed_load_store) begin
-            if (rs1_reg == SP) begin
-              allowed_instr = {C_LWSP, C_SWSP};
-            end else begin
-              allowed_instr = {C_LW, C_SW, allowed_instr};
-            end
+        allowed_instr = {LD_W, LD_WU, ST_W, LD_H, LD_HU, ST_H, allowed_instr};
+        if (cfg.enable_floating_point) begin
+          // For unaligned, we can still use aligned floating point loads/stores if address is aligned
+          if (addr[i] % 4 == 0) begin
+            allowed_instr = {FLD_S, FST_S, allowed_instr};
+          end
+          if ((XLEN >= 64) && (addr[i] % 8 == 0)) begin
+            allowed_instr = {FLD_D, FST_D, allowed_instr};
+          end
         end
         if (XLEN >= 64) begin
-          allowed_instr = {LWU, LD, SD, allowed_instr};
-          if ((offset[i] inside {[0:255]}) && (offset[i] % 8 == 0) &&
-              (RV64C inside {riscv_instr_pkg::supported_isa}) &&
-              enable_compressed_load_store) begin
-              if (rs1_reg == SP) begin
-                allowed_instr = {C_LWSP, C_SWSP};
-              end else begin
-                allowed_instr = {C_LD, C_SD, allowed_instr};
-              end
-           end
+          allowed_instr = {LD_D, ST_D, allowed_instr};
         end
       end
       instr = riscv_instr::get_load_store_instr(allowed_instr);
@@ -431,9 +411,9 @@ class riscv_load_store_rand_addr_instr_stream extends riscv_load_store_base_inst
 
   // Find an unused 4K page from address 1M onward
   constraint addr_offset_c {
-    |addr_offset[XLEN-1:20] == 1'b1;
-    // TODO(taliu) Support larger address range
-    addr_offset[XLEN-1:31] == 0;
+    // LA64: keep addresses inside LA_EMU RAM window [0x90000000, 0x98000000)
+    // Leave 4KB margin
+    addr_offset inside {[32'h9000_0000 : 32'h97FF_F000]};
     addr_offset[11:0] == 0;
   }
 
@@ -444,6 +424,68 @@ class riscv_load_store_rand_addr_instr_stream extends riscv_load_store_base_inst
 
   `uvm_object_utils(riscv_load_store_rand_addr_instr_stream)
   `uvm_object_new
+
+  // Override: initialize rs1 with the explicit random address offset (not region label)
+  virtual function void add_rs1_init_la_instr(riscv_reg_t gpr, int id, int base = 0);
+    riscv_pseudo_instr li_instr;
+    riscv_instr store_instr;
+
+    // rs1 holds absolute address = addr_offset + base (base is 0 here)
+    li_instr = riscv_pseudo_instr::type_id::create("li_instr");
+    `DV_CHECK_RANDOMIZE_WITH_FATAL(li_instr,
+       pseudo_instr_name == LI;
+       rd == gpr;
+    )
+    li_instr.imm_str = $sformatf("0x%0x", addr_offset + base);
+    instr_list.push_front(li_instr);
+    // Reserve the base register so later instructions don't clobber it
+    if(!(gpr inside {reserved_rd})) begin
+      reserved_rd = {reserved_rd, gpr};
+    end
+
+    // Initialize memory that will be loaded later
+    store_instr = riscv_instr::get_instr(ST_B);
+    `DV_CHECK_RANDOMIZE_WITH_FATAL(store_instr,
+       instr_name == ST_B;
+       rs1 == gpr;
+    )
+    foreach (load_store_instr[i]) begin
+      if (load_store_instr[i].category == LOAD) begin
+        riscv_instr store;
+        store = riscv_instr::type_id::create("store");
+        store.copy(store_instr);
+        store.rs2 = riscv_reg_t'(i % 32);
+        store.imm_str = load_store_instr[i].imm_str;
+        // LA64 instruction mapping
+        case (load_store_instr[i].instr_name) inside
+          LD_B, LD_BU : store.instr_name = ST_B;
+          LD_H, LD_HU : store.instr_name = ST_H;
+          LD_W, LD_WU : store.instr_name = ST_W;
+          LD_D : store.instr_name = ST_D;
+          FLD_S : begin
+            if (cfg.enable_floating_point) begin
+              store.instr_name = FST_S;
+            end else begin
+              `uvm_fatal(`gfn, $sformatf("Floating point load instruction generated when floating point is disabled: %0s",
+                                         load_store_instr[i].convert2asm()))
+            end
+          end
+          FLD_D : begin
+            if (cfg.enable_floating_point) begin
+              store.instr_name = FST_D;
+            end else begin
+              `uvm_fatal(`gfn, $sformatf("Floating point load instruction generated when floating point is disabled: %0s",
+                                         load_store_instr[i].convert2asm()))
+            end
+          end
+          default : `uvm_fatal(`gfn, $sformatf("Unexpected LA64 load op: %0s",
+                                               load_store_instr[i].convert2asm()))
+        endcase
+        instr_list.push_front(store);
+      end
+    end
+    // No super.add_rs1_init_la_instr; we already initialized rs1 here with absolute address
+  endfunction
 
    virtual function void randomize_offset();
     int offset_, addr_;
@@ -461,224 +503,168 @@ class riscv_load_store_rand_addr_instr_stream extends riscv_load_store_base_inst
     end
   endfunction
 
-  virtual function void add_rs1_init_la_instr(riscv_reg_t gpr, int id, int base = 0);
-    riscv_instr instr[$];
-    riscv_pseudo_instr li_instr;
-    riscv_instr store_instr;
-    riscv_instr add_instr;
-    int min_offset[$];
-    int max_offset[$];
-    min_offset = offset.min();
-    max_offset = offset.max();
-    // Use LI to initialize the address offset
-    li_instr = riscv_pseudo_instr::type_id::create("li_instr");
-    `DV_CHECK_RANDOMIZE_WITH_FATAL(li_instr,
-       pseudo_instr_name == LI;
-       rd inside {cfg.gpr};
-       rd != gpr;
-    )
-    li_instr.imm_str = $sformatf("0x%0x", addr_offset);
-    // Add offset to the base address
-    add_instr = riscv_instr::get_instr(ADD);
-    `DV_CHECK_RANDOMIZE_WITH_FATAL(add_instr,
-       rs1 == gpr;
-       rs2 == li_instr.rd;
-       rd  == gpr;
-    )
-    instr.push_back(li_instr);
-    instr.push_back(add_instr);
-    // Create SW instruction template
-    store_instr = riscv_instr::get_instr(SB);
-    `DV_CHECK_RANDOMIZE_WITH_FATAL(store_instr,
-       instr_name == SB;
-       rs1 == gpr;
-    )
-    // Initialize the location which used by load instruction later
-    foreach (load_store_instr[i]) begin
-      if (load_store_instr[i].category == LOAD) begin
-        riscv_instr store;
-        store = riscv_instr::type_id::create("store");
-        store.copy(store_instr);
-        store.rs2 = riscv_reg_t'(i % 32);
-        store.imm_str = load_store_instr[i].imm_str;
-        // TODO: C_FLDSP is in both rv32 and rv64 ISA
-        case (load_store_instr[i].instr_name) inside
-          LB, LBU : store.instr_name = SB;
-          LH, LHU : store.instr_name = SH;
-          LW, C_LW, C_LWSP, FLW, C_FLW, C_FLWSP : store.instr_name = SW;
-          LD, C_LD, C_LDSP, FLD, C_FLD, LWU     : store.instr_name = SD;
-          default : `uvm_fatal(`gfn, $sformatf("Unexpected op: %0s",
-                                               load_store_instr[i].convert2asm()))
-        endcase
-        instr.push_back(store);
-      end
-    end
-    instr_list = {instr, instr_list};
-    super.add_rs1_init_la_instr(gpr, id, 0);
-  endfunction
-
 endclass
 
-class riscv_vector_load_store_instr_stream extends riscv_mem_access_stream;
-
-  typedef enum {UNIT_STRIDED, STRIDED, INDEXED} address_mode_e;
-
-  rand bit [10:0] eew;
-  rand int unsigned data_page_id;
-  rand int unsigned num_mixed_instr;
-  rand int unsigned stride_byte_offset;
-  rand int unsigned index_addr;
-  rand address_mode_e address_mode;
-  rand riscv_reg_t rs1_reg;  // Base address
-  rand riscv_reg_t rs2_reg;  // Stride offset
-  riscv_vreg_t vs2_reg;      // Index address
-
-  constraint vec_mixed_instr_c {
-    num_mixed_instr inside {[0:10]};
-  }
-
-  constraint eew_c {
-    eew inside {cfg.vector_cfg.legal_eew};
-  }
-
-  constraint stride_byte_offset_c {
-    solve eew before stride_byte_offset;
-    // Keep a reasonable byte offset range to avoid vector memory address overflow
-    stride_byte_offset inside {[1 : 128]};
-    stride_byte_offset % (eew / 8) == 1;
-  }
-
-  constraint index_addr_c {
-    solve eew before index_addr;
-    // Keep a reasonable index address range to avoid vector memory address overflow
-    index_addr inside {[0 : 128]};
-    index_addr % (eew / 8) == 1;
-  }
-
-  constraint vec_rs_c {
-    !(rs1_reg inside {cfg.reserved_regs, reserved_rd, ZERO});
-    !(rs2_reg inside {cfg.reserved_regs, reserved_rd, ZERO});
-    rs1_reg != rs2_reg;
-  }
-
-  constraint vec_data_page_id_c {
-    data_page_id < max_data_page_id;
-  }
-
-  int base;
-  int max_load_store_addr;
-  riscv_vector_instr load_store_instr;
-
-  `uvm_object_utils(riscv_vector_load_store_instr_stream)
-  `uvm_object_new
-
-  function void post_randomize();
-    reserved_rd = {reserved_rd, rs1_reg, rs2_reg};
-    randomize_avail_regs();
-    gen_load_store_instr();
-    randomize_addr();
-    add_mixed_instr(num_mixed_instr);
-    add_rs1_init_la_instr(rs1_reg, data_page_id, base);
-    if (address_mode == STRIDED) begin
-      instr_list.push_front(get_init_gpr_instr(rs2_reg, stride_byte_offset));
-    end else if (address_mode == INDEXED) begin
-      // TODO: Support different index address for each element
-      add_init_vector_gpr_instr(vs2_reg, index_addr);
-    end
-    super.post_randomize();
-  endfunction
-
-  virtual function void randomize_addr();
-    int ss = address_span();
-    bit success;
-
-    repeat (10) begin
-      max_load_store_addr = data_page[data_page_id].size_in_bytes - ss;
-      if (max_load_store_addr >= 0) begin
-        success = 1'b1;
-        break;
-      end
-      `DV_CHECK_STD_RANDOMIZE_WITH_FATAL(data_page_id, data_page_id < max_data_page_id;)
-    end
-
-    assert (success) else begin
-      `uvm_fatal(`gfn, $sformatf({"Expected positive value for max_load_store_addr, got %0d.",
-        "  Perhaps more memory needs to be allocated in the data pages for vector loads and stores.",
-        "\ndata_page_id:%0d\ndata_page[data_page_id].size_in_bytes:%0d\naddress_span:%0d",
-        "\nstride_bytes:%0d\nVLEN:%0d\nLMUL:%0d\ncfg.vector_cfg.vtype.vsew:%0d\n\n"},
-        max_load_store_addr, data_page_id, data_page[data_page_id].size_in_bytes, ss,
-        stride_bytes(), VLEN, cfg.vector_cfg.vtype.vlmul, cfg.vector_cfg.vtype.vsew))
-    end
-
-    `DV_CHECK_STD_RANDOMIZE_WITH_FATAL(base, base inside {[0 : max_load_store_addr]};
-                                             base % eew == 0;)
-  endfunction
-
-  virtual function int address_span();
-    int num_elements = VLEN * cfg.vector_cfg.vtype.vlmul / cfg.vector_cfg.vtype.vsew;
-    case (address_mode)
-      UNIT_STRIDED : address_span = num_elements * stride_bytes();
-      STRIDED      : address_span = num_elements * stride_byte_offset;
-      INDEXED      : address_span = index_addr + num_elements * stride_bytes();
-    endcase
-  endfunction
-
-  virtual function int stride_bytes();
-    stride_bytes = eew / 8;
-  endfunction
-
-  // Generate each load/store instruction
-  virtual function void gen_load_store_instr();
-    build_allowed_instr();
-    randomize_vec_load_store_instr();
-    instr_list.push_back(load_store_instr);
-  endfunction
-
-  virtual function void build_allowed_instr();
-    case (address_mode)
-      UNIT_STRIDED : begin
-        allowed_instr = {VLE_V, VSE_V, allowed_instr};
-        if (cfg.vector_cfg.enable_fault_only_first_load) begin
-          allowed_instr = {VLEFF_V, allowed_instr};
-        end
-        if (cfg.vector_cfg.enable_zvlsseg) begin
-          allowed_instr = {VLSEGE_V, VSSEGE_V, allowed_instr};
-          if (cfg.vector_cfg.enable_fault_only_first_load) begin
-            allowed_instr = {VLSEGEFF_V, allowed_instr};
-          end
-        end
-      end
-      STRIDED : begin
-        allowed_instr = {VLSE_V, VSSE_V, allowed_instr};
-        if (cfg.vector_cfg.enable_zvlsseg) begin
-          allowed_instr = {VLSSEGE_V, VSSSEGE_V, allowed_instr};
-        end
-      end
-      INDEXED : begin
-        allowed_instr = {VLXEI_V, VSXEI_V, VSUXEI_V, allowed_instr};
-        if (cfg.vector_cfg.enable_zvlsseg) begin
-          allowed_instr = {VLXSEGEI_V, VSXSEGEI_V, VSUXSEGEI_V, allowed_instr};
-        end
-      end
-    endcase
-  endfunction
-
-  virtual function void randomize_vec_load_store_instr();
-    $cast(load_store_instr, riscv_instr::get_load_store_instr(allowed_instr));
-    load_store_instr.m_cfg = cfg;
-    load_store_instr.has_rs1 = 0;
-    load_store_instr.has_vs2 = 1;
-    load_store_instr.has_imm = 0;
-    randomize_gpr(load_store_instr);
-    load_store_instr.rs1 = rs1_reg;
-    load_store_instr.rs2 = rs2_reg;
-    load_store_instr.vs2 = vs2_reg;
-    if (address_mode == INDEXED) begin
-      cfg.vector_cfg.reserved_vregs = {load_store_instr.vs2};
-      vs2_reg = load_store_instr.vs2;
-      `uvm_info(`gfn, $sformatf("vs2_reg = v%0d", vs2_reg), UVM_LOW)
-    end
-    load_store_instr.process_load_store = 0;
-  endfunction
-
-endclass
+//class riscv_vector_load_store_instr_stream extends riscv_mem_access_stream;
+//
+//  typedef enum {UNIT_STRIDED, STRIDED, INDEXED} address_mode_e;
+//
+//  rand bit [10:0] eew;
+//  rand int unsigned data_page_id;
+//  rand int unsigned num_mixed_instr;
+//  rand int unsigned stride_byte_offset;
+//  rand int unsigned index_addr;
+//  rand address_mode_e address_mode;
+//  rand riscv_reg_t rs1_reg;  // Base address
+//  rand riscv_reg_t rs2_reg;  // Stride offset
+//  riscv_vreg_t vs2_reg;      // Index address
+//
+//  constraint vec_mixed_instr_c {
+//    num_mixed_instr inside {[0:10]};
+//  }
+//
+//  constraint eew_c {
+//    eew inside {cfg.vector_cfg.legal_eew};
+//  }
+//
+//  constraint stride_byte_offset_c {
+//    solve eew before stride_byte_offset;
+//    // Keep a reasonable byte offset range to avoid vector memory address overflow
+//    stride_byte_offset inside {[1 : 128]};
+//    stride_byte_offset % (eew / 8) == 1;
+//  }
+//
+//  constraint index_addr_c {
+//    solve eew before index_addr;
+//    // Keep a reasonable index address range to avoid vector memory address overflow
+//    index_addr inside {[0 : 128]};
+//    index_addr % (eew / 8) == 1;
+//  }
+//
+//  constraint vec_rs_c {
+//    !(rs1_reg inside {cfg.reserved_regs, reserved_rd, ZERO});
+//    !(rs2_reg inside {cfg.reserved_regs, reserved_rd, ZERO});
+//    rs1_reg != rs2_reg;
+//  }
+//
+//  constraint vec_data_page_id_c {
+//    data_page_id < max_data_page_id;
+//  }
+//
+//  int base;
+//  int max_load_store_addr;
+//  riscv_vector_instr load_store_instr;
+//
+//  `uvm_object_utils(riscv_vector_load_store_instr_stream)
+//  `uvm_object_new
+//
+//  function void post_randomize();
+//    reserved_rd = {reserved_rd, rs1_reg, rs2_reg};
+//    randomize_avail_regs();
+//    gen_load_store_instr();
+//    randomize_addr();
+//    add_mixed_instr(num_mixed_instr);
+//    add_rs1_init_la_instr(rs1_reg, data_page_id, base);
+//    if (address_mode == STRIDED) begin
+//      instr_list.push_front(get_init_gpr_instr(rs2_reg, stride_byte_offset));
+//    end else if (address_mode == INDEXED) begin
+//      // TODO: Support different index address for each element
+//      add_init_vector_gpr_instr(vs2_reg, index_addr);
+//    end
+//    super.post_randomize();
+//  endfunction
+//
+//  virtual function void randomize_addr();
+//    int ss = address_span();
+//    bit success;
+//
+//    repeat (10) begin
+//      max_load_store_addr = data_page[data_page_id].size_in_bytes - ss;
+//      if (max_load_store_addr >= 0) begin
+//        success = 1'b1;
+//        break;
+//      end
+//      `DV_CHECK_STD_RANDOMIZE_WITH_FATAL(data_page_id, data_page_id < max_data_page_id;)
+//    end
+//
+//    assert (success) else begin
+//      `uvm_fatal(`gfn, $sformatf({"Expected positive value for max_load_store_addr, got %0d.",
+//        "  Perhaps more memory needs to be allocated in the data pages for vector loads and stores.",
+//        "\ndata_page_id:%0d\ndata_page[data_page_id].size_in_bytes:%0d\naddress_span:%0d",
+//        "\nstride_bytes:%0d\nVLEN:%0d\nLMUL:%0d\ncfg.vector_cfg.vtype.vsew:%0d\n\n"},
+//        max_load_store_addr, data_page_id, data_page[data_page_id].size_in_bytes, ss,
+//        stride_bytes(), VLEN, cfg.vector_cfg.vtype.vlmul, cfg.vector_cfg.vtype.vsew))
+//    end
+//
+//    `DV_CHECK_STD_RANDOMIZE_WITH_FATAL(base, base inside {[0 : max_load_store_addr]};
+//                                             base % eew == 0;)
+//  endfunction
+//
+//  virtual function int address_span();
+//    int num_elements = VLEN * cfg.vector_cfg.vtype.vlmul / cfg.vector_cfg.vtype.vsew;
+//    case (address_mode)
+//      UNIT_STRIDED : address_span = num_elements * stride_bytes();
+//      STRIDED      : address_span = num_elements * stride_byte_offset;
+//      INDEXED      : address_span = index_addr + num_elements * stride_bytes();
+//    endcase
+//  endfunction
+//
+//  virtual function int stride_bytes();
+//    stride_bytes = eew / 8;
+//  endfunction
+//
+//  // Generate each load/store instruction
+//  virtual function void gen_load_store_instr();
+//    build_allowed_instr();
+//    randomize_vec_load_store_instr();
+//    instr_list.push_back(load_store_instr);
+//  endfunction
+//
+//  virtual function void build_allowed_instr();
+//    case (address_mode)
+//      UNIT_STRIDED : begin
+//        allowed_instr = {VLE_V, VSE_V, allowed_instr};
+//        if (cfg.vector_cfg.enable_fault_only_first_load) begin
+//          allowed_instr = {VLEFF_V, allowed_instr};
+//        end
+//        if (cfg.vector_cfg.enable_zvlsseg) begin
+//          allowed_instr = {VLSEGE_V, VSSEGE_V, allowed_instr};
+//          if (cfg.vector_cfg.enable_fault_only_first_load) begin
+//            allowed_instr = {VLSEGEFF_V, allowed_instr};
+//          end
+//        end
+//      end
+//      STRIDED : begin
+//        allowed_instr = {VLSE_V, VSSE_V, allowed_instr};
+//        if (cfg.vector_cfg.enable_zvlsseg) begin
+//          allowed_instr = {VLSSEGE_V, VSSSEGE_V, allowed_instr};
+//        end
+//      end
+//      INDEXED : begin
+//        allowed_instr = {VLXEI_V, VSXEI_V, VSUXEI_V, allowed_instr};
+//        if (cfg.vector_cfg.enable_zvlsseg) begin
+//          allowed_instr = {VLXSEGEI_V, VSXSEGEI_V, VSUXSEGEI_V, allowed_instr};
+//        end
+//      end
+//    endcase
+//  endfunction
+//
+//  virtual function void randomize_vec_load_store_instr();
+//    $cast(load_store_instr, riscv_instr::get_load_store_instr(allowed_instr));
+//    load_store_instr.m_cfg = cfg;
+//    load_store_instr.has_rs1 = 0;
+//    load_store_instr.has_vs2 = 1;
+//    load_store_instr.has_imm = 0;
+//    randomize_gpr(load_store_instr);
+//    load_store_instr.rs1 = rs1_reg;
+//    load_store_instr.rs2 = rs2_reg;
+//    load_store_instr.vs2 = vs2_reg;
+//    if (address_mode == INDEXED) begin
+//      cfg.vector_cfg.reserved_vregs = {load_store_instr.vs2};
+//      vs2_reg = load_store_instr.vs2;
+//      `uvm_info(`gfn, $sformatf("vs2_reg = v%0d", vs2_reg), UVM_LOW)
+//    end
+//    load_store_instr.process_load_store = 0;
+//  endfunction
+//
+//endclass

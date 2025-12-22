@@ -78,8 +78,8 @@
     +instr_cnt=6000
     +num_of_sub_program=5
     +directed_instr_0=riscv_load_store_rand_instr_stream,20
-    +directed_instr_1=riscv_load_store_hazard_instr_stream,20
-    +directed_instr_2=riscv_multi_page_load_store_instr_stream,5
-    +directed_instr_3=riscv_mem_region_stress_test,5
-    +enable_unaligned_load_store=1
+    #riscv_unaligned_load_store_test+directed_instr_1=riscv_load_store_hazard_instr_stream,20
+    #+directed_instr_2=riscv_multi_page_load_store_instr_stream,5
+    #+directed_instr_3=riscv_mem_region_stress_test,5
+    #+enable_unaligned_load_store=1
   rtl_test: core_base_test

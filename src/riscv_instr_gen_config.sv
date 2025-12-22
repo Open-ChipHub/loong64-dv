@@ -157,7 +157,7 @@ class riscv_instr_gen_config extends uvm_object;
   int                    instr_cnt = 200;
   int                    num_of_tests = 1;
   // For tests doesn't involve load/store, the data section generation could be skipped
-  bit                    no_data_page = 1;
+  bit                    no_data_page = 0;
   // Options to turn off some specific types of instructions
   bit                    no_branch_jump = 1;     // No branch/jump instruction
   bit                    no_load_store;      // No load/store instruction
