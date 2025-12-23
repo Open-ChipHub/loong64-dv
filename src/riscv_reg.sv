@@ -28,7 +28,7 @@ class riscv_reg_field extends uvm_object;
   bit                         hard_wired;
 
   constraint zero_reserved_field_c {
-    (access_type == WPRI) -> (val == '0);
+    (access_type == R0) -> (val == '0);
   }
 
   constraint hardwired_fld_c {

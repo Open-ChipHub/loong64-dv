@@ -388,8 +388,99 @@ package riscv_instr_pkg;
     FMSUB_D,
     FNMADD_D,
     FNMSUB_D,
-
-	
+    FCVT_S_D,
+    FCVT_D_S,
+    FFINT_S_W,
+    FFINT_S_L,
+    FFINT_D_W,
+    FFINT_D_L,
+    FTINT_W_S,
+    FTINT_L_S,
+    FTINT_W_D,
+    FTINT_L_D,
+    FTINTRM_W_S,
+    FTINTRM_W_D,
+    FTINTRM_L_S,
+    FTINTRM_L_D,
+    FTINTRP_W_S,
+    FTINTRP_W_D,
+    FTINTRP_L_S,
+    FTINTRP_L_D,
+    FTINTRZ_W_S,
+    FTINTRZ_W_D,
+    FTINTRZ_L_S,
+    FTINTRZ_L_D,
+    FTINTRNE_W_S,
+    FTINTRNE_W_D,
+    FTINTRNE_L_S,
+    FTINTRNE_L_D,
+    FRINT_S,
+    FRINT_D,
+	FMOV_S,
+    FMOV_D,
+	FSEL,
+	MOVGR2FR_W,
+	MOVGR2FR_D,
+	MOVGR2FRH_W,
+	MOVFR2GR_S,
+	MOVFR2GR_D,
+	MOVFRH2GR_S,
+    MOVGR2FCSR,
+    MOVFCSR2GR,
+    MOVFR2CF,
+    MOVCF2FR,
+    MOVGR2CF,
+    MOVCF2GR,
+	BCEQZ,
+    BCNEZ,
+    FLD_S,
+    FLD_D,
+    FST_S,
+    FST_D,
+    FLDX_S,
+    FLDX_D,
+    FSTX_S,
+    FSTX_D,
+    FLDGT_S,
+    FLDGT_D,
+    FLDLE_S,
+    FLDLE_D,
+    FSTGT_S,
+    FSTGT_D,
+    FSTLE_S,
+    FSTLE_D,
+	FCMP_S,
+    FCMP_D,
+	//csr
+	CSRRD,    
+  	CSRWR,      
+  	CSRXCHG,    
+	//IOCSR访问指令
+	IOCSRRD_B,
+	IOCSRRD_H,
+	IOCSRRD_W,
+	IOCSRRD_D,
+	IOCSRWR_B,
+	IOCSRWR_H,
+	IOCSRWR_W,
+	IOCSRWR_D,
+	//Cache维护指令
+	CACOP,
+	//TLB维护指令
+	TLBSRCH,
+	TLBRD,
+	TLBWR,
+	TLBFILL,
+	TLBCLR,
+	TLBFLUSH,
+	INVTLB,
+	//软件页表遍历指令
+	LDDIR,
+	LDPTE,
+	//其它杂项指令
+	ERTN,
+	DBCL,
+	IDLE,
     // Custom instructions
     `include "isa/custom/riscv_custom_instr_enum.sv"
     // You can add other instructions here
@@ -497,7 +588,115 @@ package riscv_instr_pkg;
     PRMD         = 'h0001,
     EUEN         = 'h0002,
     MISC         = 'h0003,
-    ECFG         = 'h0004
+    ECFG         = 'h0004,
+    ESTAT        = 'h0005,
+    ERA          = 'h0006,
+    BADV         = 'h0007,
+    BADI         = 'h0008,
+    EENTRY       = 'h000c,
+
+    // TLB related
+    TLBIDX       = 'h0010,
+    TLBEHI       = 'h0011,
+    TLBELO0      = 'h0012,
+    TLBELO1      = 'h0013,
+
+    // Page table / ASID
+    ASID         = 'h0018,
+    PGDL         = 'h0019,
+    PGDH         = 'h001a,
+    PGD          = 'h001b,
+    PWCL         = 'h001c,
+    PWCH         = 'h001d,
+    STLBPS       = 'h001e,
+    RVACFG       = 'h001f,
+
+    // Identification / config
+    CPUID        = 'h0020,
+    PRCFG1       = 'h0021,
+    PRCFG2       = 'h0022,
+    PRCFG3       = 'h0023,
+
+    // Save registers
+    SAVE0        = 'h0030,
+    SAVE1        = 'h0031,
+    SAVE2        = 'h0032,
+    SAVE3        = 'h0033,
+    SAVE4        = 'h0034,
+    SAVE5        = 'h0035,
+    SAVE6        = 'h0036,
+    SAVE7        = 'h0037,
+    SAVE8        = 'h0038,
+    SAVE9        = 'h0039,
+    SAVE10       = 'h003a,
+    SAVE11       = 'h003b,
+    SAVE12       = 'h003c,
+    SAVE13       = 'h003d,
+    SAVE14       = 'h003e,
+    SAVE15       = 'h003f,
+
+    // Timer / counter
+    TID          = 'h0040,
+    TCFG         = 'h0041,
+    TVAL         = 'h0042,
+    CNTC         = 'h0043,
+    TICLR        = 'h0044,
+
+    // LLBit control
+    LLBCTL       = 'h0060,
+
+    // Implementation controls and TLB replay
+    IMPCTL1      = 'h0080,
+    IMPCTL2      = 'h0081,
+    TLBRENTRY    = 'h0088,
+    TLBRBADV     = 'h0089,
+    TLBRERA      = 'h008a,
+    TLBRRSAVE    = 'h008b,
+    TLBRELO0     = 'h008c,
+    TLBRELO1     = 'h008d,
+    TLBREHI      = 'h008e,
+    TLBRPRMD     = 'h008f,
+
+    // Machine error / debug
+    MERRCTL      = 'h0090,
+    MERRINFO1    = 'h0091,
+    MERRINFO2    = 'h0092,
+    MERRENTRY    = 'h0093,
+    MERRERA      = 'h0094,
+    MERRSAVE     = 'h0095,
+
+    CTAG         = 'h0098,
+
+    // Message / interrupt status
+    MSGIS0       = 'h00a0,
+    MSGIS1       = 'h00a1,
+    MSGIS2       = 'h00a2,
+    MSGIS3       = 'h00a3,
+    MSGIR        = 'h00a4,
+    MSGIE        = 'h00a5,
+
+    // DMW, performance, etc. (base addresses; per-index handled elsewhere)
+	DMW0         = 'h0180,
+    DMW1         = 'h0181,
+    DMW2         = 'h0182,
+    DMW3         = 'h0183,
+    PMCFG0       = 'h0200,
+    PMCFG        = 'h0200,  // Alias for PMCFG0
+    PMCNT0       = 'h0201,
+    PMCNT        = 'h0201,  // Alias for PMCNT0
+
+    // Watchpoint / load-store monitoring
+    MWPC         = 'h0300,
+    MWPS         = 'h0301,
+
+    // FWPC / FWPS (fetch watchpoints)
+    FWPC         = 'h0380,
+    FWPS         = 'h0381,
+
+    // Debug registers
+    DBG          = 'h0500,
+    DERA         = 'h0501,
+    DSAVE        = 'h0502
   } privileged_reg_t;
 
   typedef enum bit [5:0] {
@@ -517,9 +716,10 @@ package riscv_instr_pkg;
   } privileged_level_t;
 
   typedef enum bit [1:0] {
-    WPRI, // Reserved Writes Preserve Values, Reads Ignore Value
-    WLRL, // Write/Read Only Legal Values
-    WARL  // Write Any Values, Reads Legal Values
+	RW,
+	R,
+	R0,
+	W1
   } reg_field_access_t;
 
   //Pseudo instructions
@@ -924,6 +1124,7 @@ package riscv_instr_pkg;
   // `include "isa/riscv_zbs_instr.sv"
   // `include "isa/riscv_b_instr.sv"
   // `include "isa/riscv_csr_instr.sv"
+  `include "isa/la64_csr_instr.sv"
   `include "isa/riscv_floating_point_instr.sv"
   // `include "isa/riscv_vector_instr.sv"
   // `include "isa/riscv_compressed_instr.sv"
@@ -956,11 +1157,12 @@ package riscv_instr_pkg;
   // `include "isa/custom/rv64x_instr.sv"
   `include "isa/la64i_instr.sv"
   `include "isa/la64f_instr.sv"
+  `include "isa/la64plv_instr.sv"
 
   `include "riscv_pseudo_instr.sv"
   // `include "riscv_illegal_instr.sv"
-  // `include "riscv_reg.sv"   // 疑似给CSR寄存器用的
-  // `include "riscv_privil_reg.sv"
+  `include "riscv_reg.sv"   
+  `include "la64_privil_reg.sv"
   // `include "riscv_page_table_entry.sv"
   // `include "riscv_page_table_exception_cfg.sv"
   // `include "riscv_page_table.sv"
