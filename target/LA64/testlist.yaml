@@ -83,3 +83,16 @@
     #+directed_instr_3=riscv_mem_region_stress_test,5
     #+enable_unaligned_load_store=1
   rtl_test: core_base_test
+
+# LA64 CSR基础测试
+- test: la64_csr_basic_test
+  description: >
+    Test LA64 CSR instructions (CSRRD/CSRWR/CSRXCHG)
+  gen_test: riscv_rand_instr_test
+  gen_opts: >
+    +instr_cnt=5000
+    +no_csr_instr=0
+    +gen_all_csrs_by_default=1
+    +boot_mode=m
+  iterations: 5
+  rtl_test: core_base_test
