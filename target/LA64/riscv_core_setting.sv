@@ -102,34 +102,22 @@ privileged_reg_t implemented_csr[] = {
 `else
 const privileged_reg_t implemented_csr[] = {
 `endif
-// Basic
+	// Exactly matches la64_privil_reg.sv - 64 CSR cases
   CRMD, PRMD, EUEN, MISC, ECFG, ESTAT, ERA, BADV, BADI, EENTRY,
-  // TLB/Page
-  TLBIDX, TLBEHI, TLBELO0, TLBELO1, ASID, PGDL, PGDH, PGD, PWCL, PWCH, STLBPS, RVACFG,
-  // ID/Config
-  CPUID, PRCFG1, PRCFG2, PRCFG3,
-  // Save regs
-  SAVE0, SAVE1, SAVE2, SAVE3, SAVE4, SAVE5, SAVE6, SAVE7,
-  SAVE8, SAVE9, SAVE10, SAVE11, SAVE12, SAVE13, SAVE14, SAVE15,
-  // Timers
+  RVACFG, CPUID, PRCFG1, PRCFG2, PRCFG3,
+  SAVE0,
+  LLCTL,
+  TLBIDX, TLBEHI, TLBELO0, TLBELO1,
+  ASID, PGDL, PGDH, PGD, PWCL, PWCH, STLBPS,
+  TLBRENTRY, TLBRBADV, TLBRERA, TLBRSAVE, TLBRELO0, TLBRELO1, TLBREHI, TLBRPRMD,
+  DMW0, DMW1, DMW2, DMW3,
   TID, TCFG, TVAL, CNTC, TICLR,
-  // LLBit / impl controls
-  LLBCTL, IMPCTL1, IMPCTL2,
-  // TLB replay / error
-  TLBRENTRY, TLBRBADV, TLBRERA, TLBRRSAVE, TLBRELO0, TLBRELO1, TLBREHI, TLBRPRMD,
-  // Machine error / debug
-  MERRCTL, MERRINFO1, MERRINFO2, MERRENTRY, MERRERA, MERRSAVE,
-  CTAG,
-  // Message / interrupt status
-  MSGIS0, MSGIS1, MSGIS2, MSGIS3, MSGIR, MSGIE,
-  // DMW/Performance base regs
-  DMW0, PMCFG0, PMCNT0,
-  // Watchpoint / monitoring
+  MERRCTL, MERRENTRY, MERRERA, MERRSAVE,
+  PMCFG, PMCNT,
   MWPC, MWPS,
-  // Fetch watchpoint
-  FWPC, FWPS,
-  // Debug
-  DBG, DERA, DSAVE
+  DBG, DERA, DSAVE,
+  MSGIS0, MSGIS1, MSGIS2, MSGIS3, MSGIR, MSGIE,
+  FWPC, FWPS
 };
 
 // Implementation-specific custom CSRs

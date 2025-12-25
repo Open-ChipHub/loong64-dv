@@ -12,22 +12,14 @@ class la64_privileged_instr extends riscv_instr;
   
   // Instruction-specific fields
   rand bit [13:0] csr_addr;   // For CSR/IOCSR instructions (14-bit for LA64)
-  rand bit [4:0]  op;         // For INVTLB, CACOP
-  rand bit [4:0]  level;      // For IDLE, LDDIR
-  rand bit [2:0]  seq;        // For LDPTE
-  rand bit [14:0] hint;       // For DBCL
+  rand bit [4:0]  op;         // For INVTLB (5-bit), CACOP code (5-bit)
+  rand bit [7:0]  lddir_level; // For LDDIR (8-bit)
+  rand bit [14:0] idle_level;  // For IDLE (15-bit)
+  rand bit [7:0]  seq;        // For LDPTE (8-bit)
+  rand bit [14:0] hint;       // For DBCL (15-bit)
   
-  // Constraint: TLB and ERTN instructions have all register fields = 0
-  constraint zero_regs_c {
-    if (instr_name inside {TLBSRCH, TLBRD, TLBWR, TLBFILL, TLBCLR, TLBFLUSH, ERTN}) {
-      rs1 == ZERO;
-      rd == ZERO;
-    }
-    if (instr_name inside {DBCL, IDLE}) {
-      rs1 == ZERO;
-      rd == ZERO;
-    }
-  }
+  // Note: Instructions without register operands (TLB, ERTN, DBCL, IDLE) have 
+  // has_rs1=0 and has_rd=0, so they don't need register constraints
   
   `uvm_object_utils(la64_privileged_instr)
   
@@ -64,11 +56,11 @@ class la64_privileged_instr extends riscv_instr;
         has_imm = 1'b1;  
       end
       
-      // 4.2.4 TLB维护指令 (R2_TYPE with all regs = 0)
+      // 4.2.4 TLB维护指令 (no operands)
       TLBSRCH, TLBRD, TLBWR, TLBFILL, TLBCLR, TLBFLUSH: begin
-        has_rs1 = 1'b1;  
+        has_rs1 = 1'b0;  // No register operands in assembly
         has_rs2 = 1'b0;
-        has_rd  = 1'b1;  
+        has_rd  = 1'b0;  
         has_imm = 1'b0;
       end
       
@@ -94,25 +86,25 @@ class la64_privileged_instr extends riscv_instr;
         has_imm = 1'b1;  
       end
       
-      // 4.2.6 其它杂项指令 (R2_TYPE format)
+      // 4.2.6 其它杂项指令
       ERTN: begin
-        has_rs1 = 1'b1;  
+        has_rs1 = 1'b0;  // No operands in assembly
         has_rs2 = 1'b0;
-        has_rd  = 1'b1;  
+        has_rd  = 1'b0;  
         has_imm = 1'b0;
       end
       
       DBCL: begin
-        has_rs1 = 1'b1;  
+        has_rs1 = 1'b0;  // Only immediate in assembly: dbcl hint
         has_rs2 = 1'b0;
-        has_rd  = 1'b1;  
+        has_rd  = 1'b0;  
         has_imm = 1'b1;  
       end
       
       IDLE: begin
-        has_rs1 = 1'b1;  
+        has_rs1 = 1'b0;  // Only immediate in assembly: idle level
         has_rs2 = 1'b0;
-        has_rd  = 1'b1;  
+        has_rd  = 1'b0;  
         has_imm = 1'b1;  
       end
       
@@ -133,16 +125,16 @@ class la64_privileged_instr extends riscv_instr;
       
       // 4.2.2 IOCSR访问指令
       IOCSRRD_B, IOCSRRD_H, IOCSRRD_W, IOCSRRD_D: begin
-        asm_str = $sformatf("%0s%0s, %0s", asm_str, rd.name(), rs1.name());
+        asm_str = $sformatf("%0s$%0s, $%0s", asm_str, rd.name(), rs1.name());
       end
       
       IOCSRWR_B, IOCSRWR_H, IOCSRWR_W, IOCSRWR_D: begin
-        asm_str = $sformatf("%0s%0s, %0s", asm_str, rd.name(), rs1.name());
+        asm_str = $sformatf("%0s$%0s, $%0s", asm_str, rd.name(), rs1.name());
       end
       
       // 4.2.3 Cache维护指令
       CACOP: begin
-        asm_str = $sformatf("%0s0x%0x, %0s, %0d", 
+        asm_str = $sformatf("%0s0x%0x, $%0s, %0d", 
                            asm_str, op, rs1.name(), $signed(imm[11:0]));
       end
       
@@ -152,18 +144,18 @@ class la64_privileged_instr extends riscv_instr;
       end
       
       INVTLB: begin
-        asm_str = $sformatf("%0s0x%0x, %0s, %0s", 
+        asm_str = $sformatf("%0s0x%0x, $%0s, $%0s", 
                            asm_str, op, rs1.name(), rs2.name());
       end
       
       // 4.2.5 软件页表遍历指令
       LDDIR: begin
-        asm_str = $sformatf("%0s%0s, %0s, 0x%0x", 
-                           asm_str, rd.name(), rs1.name(), level);
+        asm_str = $sformatf("%0s$%0s, $%0s, 0x%0x", 
+                           asm_str, rd.name(), rs1.name(), lddir_level);
       end
       
       LDPTE: begin
-        asm_str = $sformatf("%0s%0s, 0x%0x", 
+        asm_str = $sformatf("%0s$%0s, 0x%0x", 
                            asm_str, rs1.name(), seq);
       end
       
@@ -177,7 +169,7 @@ class la64_privileged_instr extends riscv_instr;
       end
       
       IDLE: begin
-        asm_str = $sformatf("%0s0x%0x", asm_str, level);
+        asm_str = $sformatf("%0s0x%0x", asm_str, idle_level);
       end
       
       default: begin
@@ -224,17 +216,23 @@ class la64_privileged_instr extends riscv_instr;
     // Sync instruction-specific fields with imm
     case (instr_name)
       // Note: CSR instructions are handled by la64_csr_instr class
-      INVTLB, CACOP: begin
-        op = imm[4:0];
+      INVTLB: begin
+        op = imm[4:0];  // 5-bit op field
       end
-      LDDIR, IDLE: begin
-        level = imm[4:0];
+      CACOP: begin
+		// op is the 5-bit code, imm[11:0] is the si12 offset
+      end
+      LDDIR: begin
+        lddir_level = imm[7:0];  // 8-bit level field
+      end
+      IDLE: begin
+        idle_level = imm[14:0];  // 15-bit level field
       end
       LDPTE: begin
-        seq = imm[2:0];
+        seq = imm[7:0];  // 8-bit seq field
       end
       DBCL: begin
-        hint = imm[14:0];
+        hint = imm[14:0];  // 15-bit hint field
       end
     endcase
   endfunction

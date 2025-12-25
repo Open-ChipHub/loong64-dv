@@ -103,7 +103,7 @@ class la64_privil_reg extends riscv_reg#(privileged_reg_t);
         add_field("STLBSets", 6, R);
         add_field("RESERVED", XLEN - (4+8+8+6), R0);
       end
-      SAVE: begin
+      SAVE0: begin
         add_field("Data", XLEN, RW);
       end
       LLCTL: begin

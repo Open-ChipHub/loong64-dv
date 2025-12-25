@@ -154,9 +154,9 @@ class riscv_instr extends uvm_object;
   static function void build_basic_instruction_list(riscv_instr_gen_config cfg);
     basic_instr = {instr_category[SHIFT], instr_category[ARITHMETIC], instr_category[BRANCH],
                    instr_category[LOGICAL], instr_category[COMPARE], instr_category[BITOPERATION]};
-    // if ((cfg.no_csr_instr == 0) && (cfg.init_privileged_mode == MACHINE_MODE)) begin
-    //   basic_instr = {basic_instr, instr_category[CSR]};
-    // end
+    if ((cfg.no_csr_instr == 0) && (cfg.init_privileged_mode == MACHINE_MODE)) begin
+      basic_instr = {basic_instr, instr_category[CSR]};
+    end
   endfunction : build_basic_instruction_list
 
   static function riscv_instr get_rand_instr(riscv_instr instr_h = null,

@@ -1,7 +1,7 @@
 // LA64 CSR instruction class: CSRRD / CSRWR / CSRXCHG
 class la64_csr_instr extends riscv_instr;
-  // CSR address (14-bit)
-  rand bit [13:0] csr;
+  // CSR address is inherited from parent class (14-bit for LA64)
+  // Note: Parent class riscv_instr already declares: rand bit [13:0] csr;
 
   // Privileged CSR filters (use package enum)
   static riscv_instr_pkg::privileged_reg_t exclude_reg[$];
@@ -20,11 +20,11 @@ class la64_csr_instr extends riscv_instr;
   }
 
   // Decide whether write is allowed for chosen CSR
-  // For LA64 we use top two CSR bits [13:12] to indicate read-only region (heuristic).
+  // For LA64, read-only CSRs are determined by the include_write_reg list
+  // Note: LA64 CSR addresses are all < 0x1000, so we can't use bit pattern like RISC-V
   constraint write_csr_c {
-    if(!((csr[13:12] == 2'b11 && allow_ro_write) ||
-         ((include_write_reg.size() > 0) && (csr inside {include_write_reg})) ||
-         ((csr[13:12] != 2'b11) && (include_write_reg.size() == 0))))
+    if(!(((include_write_reg.size() > 0) && (csr inside {include_write_reg})) ||
+         (allow_ro_write && (include_write_reg.size() == 0))))
       write_csr == 1'b0;
   }
 
@@ -40,6 +40,14 @@ class la64_csr_instr extends riscv_instr;
     solve write_csr before rs1, rs2, imm;
   }
 
+  // LA64 hardware constraint: CSRXCHG requires rj (rs1) != r0 && rj != r1
+  constraint csrxchg_rs1_c {
+    if (instr_name == CSRXCHG) {
+      rs1 != ZERO;
+      rs1 != R1;
+    }
+  }
+
   `uvm_object_utils(la64_csr_instr)
 
   function new(string name = "");
@@ -48,6 +56,17 @@ class la64_csr_instr extends riscv_instr;
 
   // Create CSR filter based on generator config (similar to riscv variant)
   static function void create_csr_filter(riscv_instr_gen_config cfg);
+    // LA64 read-only CSRs (based on LoongArch manual)
+    riscv_instr_pkg::privileged_reg_t read_only_csr[] = {
+      CPUID,    
+      PRCFG1, PRCFG2, PRCFG3,  
+      PGD,      
+      TVAL,     
+      DBG,      
+      ESTAT,    
+      MSGIS0, MSGIS1, MSGIS2, MSGIS3  
+    };
+    
     include_reg.delete();
     exclude_reg.delete();
 
@@ -60,9 +79,11 @@ class la64_csr_instr extends riscv_instr;
     end else if (cfg.gen_all_csrs_by_default) begin
       allow_ro_write = cfg.gen_csr_ro_write;
       include_reg = {implemented_csr};
-      // build include_write_reg from defaults + add/remove lists
-      // Start with implemented_csr as the base, then apply add/remove filters
-      create_include_write_reg(cfg.add_csr_write, cfg.remove_csr_write, {implemented_csr});
+      // Build writable CSR list: start with implemented CSRs, 
+      // exclude read-only ones (by passing them to remove list)
+      create_include_write_reg(cfg.add_csr_write, 
+                              {cfg.remove_csr_write, read_only_csr}, 
+                              {implemented_csr});
     end else begin
       // LA64 uses SAVE registers instead of SCRATCH registers
       // Use SAVE0 as the default safe CSR to avoid side effects
@@ -92,10 +113,10 @@ class la64_csr_instr extends riscv_instr;
         has_rs1 = 1'b0;
         has_rd  = 1'b1;
       end else if (instr_name == CSRWR) begin
-        has_rs1 = 1'b1;
-        has_rd  = 1'b0;
+        has_rs1 = 1'b0;
+        has_rd  = 1'b1;
       end else if (instr_name == CSRXCHG) begin
-        has_rs1 = 1'b1;
+        has_rs1 = 1'b1;  
         has_rd  = 1'b1;
       end else begin
         has_rs1 = 1'b0;
@@ -111,14 +132,13 @@ class la64_csr_instr extends riscv_instr;
       // R2I14_TYPE used for CSRRD/CSRWR/CSRXCHG: two-reg + 14-bit immediate variant
       R2I14_TYPE: begin
         if (instr_name == CSRRD) begin
-          asm_str = $sformatf("%0s%0s, 0x%0x", asm_str, rd.name(), csr);
+          asm_str = $sformatf("%0s$%0s, 0x%0x", asm_str, rd.name(), csr);
         end else if (instr_name == CSRWR) begin
-          asm_str = $sformatf("%0s%0s, 0x%0x", asm_str, rs1.name(), csr);
+          asm_str = $sformatf("%0s$%0s, 0x%0x", asm_str, rd.name(), csr);
         end else if (instr_name == CSRXCHG) begin
-          // csrxchg rd, rj, csr_num
-          asm_str = $sformatf("%0s%0s, %0s, 0x%0x", asm_str, rd.name(), rs1.name(), csr);
+          asm_str = $sformatf("%0s$%0s, $%0s, 0x%0x", asm_str, rd.name(), rs1.name(), csr);
         end else begin
-          asm_str = $sformatf("%0s%0s, 0x%0x", asm_str, rd.name(), csr);
+          asm_str = $sformatf("%0s$%0s, 0x%0x", asm_str, rd.name(), csr);
         end
       end
       default: `uvm_fatal(`gfn, $sformatf("Unsupported format %0s [%0s]", format.name(), instr_name.name()))
@@ -128,9 +148,7 @@ class la64_csr_instr extends riscv_instr;
   endfunction
 
   function bit [6:0] get_opcode();
-    // LA64 CSR opcode per docs
     get_opcode = 7'b0000100;
   endfunction
 
 endclass
-

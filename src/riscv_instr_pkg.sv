@@ -583,8 +583,7 @@ package riscv_instr_pkg;
   typedef bit [13:0] riscv_csr_t;   // LA64的CSR是14位
 
   typedef enum bit [13:0] {   // LA64 TODO 暂未实现CSR
-    // User mode register
-    CRMD         = 'h0000,
+	CRMD         = 'h0000,
     PRMD         = 'h0001,
     EUEN         = 'h0002,
     MISC         = 'h0003,
@@ -594,14 +593,17 @@ package riscv_instr_pkg;
     BADV         = 'h0007,
     BADI         = 'h0008,
     EENTRY       = 'h000c,
-
-    // TLB related
+    RVACFG       = 'h001f,
+    CPUID        = 'h0020,
+    PRCFG1       = 'h0021,
+    PRCFG2       = 'h0022,
+    PRCFG3       = 'h0023,
+    SAVE0         = 'h0030,
+    LLCTL        = 'h0060,
     TLBIDX       = 'h0010,
     TLBEHI       = 'h0011,
     TLBELO0      = 'h0012,
     TLBELO1      = 'h0013,
-
-    // Page table / ASID
     ASID         = 'h0018,
     PGDL         = 'h0019,
     PGDH         = 'h001a,
@@ -609,94 +611,42 @@ package riscv_instr_pkg;
     PWCL         = 'h001c,
     PWCH         = 'h001d,
     STLBPS       = 'h001e,
-    RVACFG       = 'h001f,
-
-    // Identification / config
-    CPUID        = 'h0020,
-    PRCFG1       = 'h0021,
-    PRCFG2       = 'h0022,
-    PRCFG3       = 'h0023,
-
-    // Save registers
-    SAVE0        = 'h0030,
-    SAVE1        = 'h0031,
-    SAVE2        = 'h0032,
-    SAVE3        = 'h0033,
-    SAVE4        = 'h0034,
-    SAVE5        = 'h0035,
-    SAVE6        = 'h0036,
-    SAVE7        = 'h0037,
-    SAVE8        = 'h0038,
-    SAVE9        = 'h0039,
-    SAVE10       = 'h003a,
-    SAVE11       = 'h003b,
-    SAVE12       = 'h003c,
-    SAVE13       = 'h003d,
-    SAVE14       = 'h003e,
-    SAVE15       = 'h003f,
-
-    // Timer / counter
+    TLBRENTRY    = 'h0088,
+    TLBRBADV     = 'h0089,
+    TLBRERA      = 'h008a,
+    TLBRSAVE     = 'h008b,
+    TLBRELO0     = 'h008c,
+    TLBRELO1     = 'h008d,
+    TLBREHI      = 'h008e,
+    TLBRPRMD     = 'h008f,
+    DMW0         = 'h0180,
+    DMW1         = 'h0181,
+    DMW2         = 'h0182,
+    DMW3         = 'h0183,
     TID          = 'h0040,
     TCFG         = 'h0041,
     TVAL         = 'h0042,
     CNTC         = 'h0043,
     TICLR        = 'h0044,
-
-    // LLBit control
-    LLBCTL       = 'h0060,
-
-    // Implementation controls and TLB replay
-    IMPCTL1      = 'h0080,
-    IMPCTL2      = 'h0081,
-    TLBRENTRY    = 'h0088,
-    TLBRBADV     = 'h0089,
-    TLBRERA      = 'h008a,
-    TLBRRSAVE    = 'h008b,
-    TLBRELO0     = 'h008c,
-    TLBRELO1     = 'h008d,
-    TLBREHI      = 'h008e,
-    TLBRPRMD     = 'h008f,
-
-    // Machine error / debug
     MERRCTL      = 'h0090,
-    MERRINFO1    = 'h0091,
-    MERRINFO2    = 'h0092,
     MERRENTRY    = 'h0093,
     MERRERA      = 'h0094,
     MERRSAVE     = 'h0095,
-
-    CTAG         = 'h0098,
-
-    // Message / interrupt status
+    PMCFG        = 'h0200,
+    PMCNT        = 'h0201,
+    MWPC         = 'h0300,
+    MWPS         = 'h0301,
+    DBG          = 'h0500,
+    DERA         = 'h0501,
+    DSAVE        = 'h0502,
     MSGIS0       = 'h00a0,
     MSGIS1       = 'h00a1,
     MSGIS2       = 'h00a2,
     MSGIS3       = 'h00a3,
     MSGIR        = 'h00a4,
     MSGIE        = 'h00a5,
-
-    // DMW, performance, etc. (base addresses; per-index handled elsewhere)
-	DMW0         = 'h0180,
-    DMW1         = 'h0181,
-    DMW2         = 'h0182,
-    DMW3         = 'h0183,
-    PMCFG0       = 'h0200,
-    PMCFG        = 'h0200,  // Alias for PMCFG0
-    PMCNT0       = 'h0201,
-    PMCNT        = 'h0201,  // Alias for PMCNT0
-
-    // Watchpoint / load-store monitoring
-    MWPC         = 'h0300,
-    MWPS         = 'h0301,
-
-    // FWPC / FWPS (fetch watchpoints)
     FWPC         = 'h0380,
-    FWPS         = 'h0381,
-
-    // Debug registers
-    DBG          = 'h0500,
-    DERA         = 'h0501,
-    DSAVE        = 'h0502
+    FWPS         = 'h0381
   } privileged_reg_t;
 
   typedef enum bit [5:0] {
@@ -704,7 +654,7 @@ package riscv_instr_pkg;
     MXL,        // mis.mxl
     EXTENSION,  // mis.extension
     MODE,       // satp.mode
-    ASID,       // satp.asid
+    ASID_FLD,       // satp.asid
     PPN         // satp.ppn
   } privileged_reg_fld_t;   // TODO
 
@@ -1125,6 +1075,7 @@ package riscv_instr_pkg;
   // `include "isa/riscv_b_instr.sv"
   // `include "isa/riscv_csr_instr.sv"
   `include "isa/la64_csr_instr.sv"
+  `include "isa/la64_privileged_instr.sv"
   `include "isa/riscv_floating_point_instr.sv"
   // `include "isa/riscv_vector_instr.sv"
   // `include "isa/riscv_compressed_instr.sv"
