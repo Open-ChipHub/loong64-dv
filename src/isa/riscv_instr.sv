@@ -93,6 +93,10 @@ class riscv_instr extends uvm_object;
   constraint la64_jump_imm_c {
     if (group == LA64 && (category == BRANCH || category == JUMP)) {
       imm[1:0] == 0;
+	if (format == I26_TYPE) {
+        (imm[25] == 0) -> (imm[24:16] == 0);
+        (imm[25] == 1) -> (imm[24:16] == 9'h1FF);
+      }
     }
   }
 

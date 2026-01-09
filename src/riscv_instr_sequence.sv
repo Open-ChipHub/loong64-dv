@@ -37,7 +37,7 @@ class riscv_instr_sequence extends uvm_sequence;
 
   int unsigned             instr_cnt;            // Instruction count of this sequence
   // riscv_push_stack_instr   instr_stack_enter;    // Stack push instructions for sub-programs
-  // riscv_pop_stack_instr    instr_stack_exit;     // Stack pop instructions for sub-programs
+  riscv_pop_stack_instr    instr_stack_exit;     // Stack pop instructions for sub-programs
   riscv_rand_instr_stream  instr_stream;         // Main instruction streams
   bit                      is_main_program;      // Type of this sequence (main or sub program)
   bit                      is_debug_program;     // Indicates whether sequence is debug program
@@ -58,7 +58,7 @@ class riscv_instr_sequence extends uvm_sequence;
       `uvm_fatal(get_full_name(), "Cannot get instr_gen_cfg")
     instr_stream = riscv_rand_instr_stream::type_id::create("instr_stream");
     // instr_stack_enter = riscv_push_stack_instr::type_id::create("instr_stack_enter");
-    // instr_stack_exit  = riscv_pop_stack_instr::type_id::create("instr_stack_exit");
+    instr_stack_exit  = riscv_pop_stack_instr::type_id::create("instr_stack_exit");
     // illegal_instr = riscv_illegal_instr::type_id::create("illegal_instr");
   endfunction
 
@@ -234,21 +234,29 @@ class riscv_instr_sequence extends uvm_sequence;
   // The jump routine is implmented with an atomic instruction stream(riscv_jump_instr). Similar
   // to load/store instructions, JALR/JAL instructions also need a proper base address and offset
   // as the jump target.
-  // function void insert_jump_instr(string target_label, int idx);
-  //   riscv_jump_instr jump_instr;
-  //   jump_instr = riscv_jump_instr::type_id::create("jump_instr");
-  //   jump_instr.target_program_label = target_label;
-  //   if(!is_main_program)
-  //     jump_instr.stack_exit_instr = instr_stack_exit.pop_stack_instr;
-  //   jump_instr.cfg = cfg;
-  //   jump_instr.label = label_name;
-  //   jump_instr.idx = idx;
-  //   jump_instr.use_jalr = is_main_program;
-  //   `DV_CHECK_RANDOMIZE_FATAL(jump_instr)
-  //   instr_stream.insert_instr_stream(jump_instr.instr_list);
-  //   `uvm_info(get_full_name(), $sformatf("%0s -> %0s...done",
-  //             jump_instr.jump.instr_name.name(), target_label), UVM_LOW)
-  // endfunction
+  function void insert_jump_instr(string target_label, int idx);
+    riscv_jump_instr jump_instr;
+    jump_instr = riscv_jump_instr::type_id::create("jump_instr");
+    jump_instr.target_program_label = target_label;
+    if(!is_main_program) begin
+      // Initialize stack exit instructions if not already initialized
+      if(instr_stack_exit.pop_stack_instr.size() == 0) begin
+        instr_stack_exit.cfg = cfg;
+        // Use empty array if stack exit instructions are not generated
+        jump_instr.stack_exit_instr = {};
+      end else begin
+        jump_instr.stack_exit_instr = instr_stack_exit.pop_stack_instr;
+      end
+    end
+    jump_instr.cfg = cfg;
+    jump_instr.label = label_name;
+    jump_instr.idx = idx;
+    jump_instr.use_jalr = is_main_program;
+    `DV_CHECK_RANDOMIZE_FATAL(jump_instr)
+    instr_stream.insert_instr_stream(jump_instr.instr_list);
+    `uvm_info(get_full_name(), $sformatf("%0s -> %0s...done",
+              jump_instr.jump.instr_name.name(), target_label), UVM_LOW)
+  endfunction
 
   // Convert the instruction stream to the string format.
   // Label is attached to the instruction if available, otherwise attach proper space to make

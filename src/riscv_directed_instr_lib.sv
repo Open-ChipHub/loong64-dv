@@ -165,11 +165,14 @@ class riscv_jump_instr extends riscv_directed_instr_stream;
       // Jump to a misaligned address
       jump.imm_str = $sformatf("%0d", -imm + 2);
     end else begin
-      jump.imm_str = $sformatf("%0d", -imm);
+	  // For LoongArch JIRL, immediate must be word-aligned (low 2 bits zero)
+      if (jump.group == LA64 && jump.instr_name == JIRL) begin
+        int aligned_imm = (-imm) & ~3;  // Clear low 2 bits to ensure 4-byte alignment
+        jump.imm_str = $sformatf("%0d", aligned_imm);
+      end else begin
+        jump.imm_str = $sformatf("%0d", -imm);
+      end
     end
-    // The branch instruction is always inserted right before the jump instruction to avoid
-    // skipping other required instructions like restore stack, load jump base etc.
-    // The purse of adding the branch instruction here is to cover branch -> jump scenario.
     if(enable_branch) instr = {branch};
     // Restore stack before unconditional jump
     if(jump.rd == ZERO) begin
@@ -177,11 +180,12 @@ class riscv_jump_instr extends riscv_directed_instr_stream;
     end
     if(jump.instr_name == BL) begin
       jump.imm_str = target_program_label;
+      mix_instr_stream(instr);
+      instr_list = {instr_list, jump};
     end else begin
-      instr = {la, addi, instr};
+      mix_instr_stream(instr);
+      instr_list = {instr_list, la, addi, jump};
     end
-    mix_instr_stream(instr);
-    instr_list = {instr_list, jump};
     foreach(instr_list[i]) begin
       instr_list[i].has_label = 1'b0;
       instr_list[i].atomic = 1'b1;
