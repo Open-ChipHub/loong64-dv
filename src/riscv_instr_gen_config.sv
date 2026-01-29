@@ -165,6 +165,9 @@ class riscv_instr_gen_config extends uvm_object;
   bit                    no_ebreak = 1;      // No ebreak instruction
   // Only enable ecall if you have overriden the test_done mechanism.
   bit                    no_ecall = 1;       // No ecall instruction
+  // LA64 syscall/break
+  bit                    no_syscall = 1;     // No syscall instruction
+  bit                    no_break = 1;       // No break instruction
   bit                    no_dret = 1;        // No dret instruction
   bit                    no_fence;           // No fence instruction
   bit                    no_wfi = 1;         // No WFI instruction
@@ -493,6 +496,8 @@ class riscv_instr_gen_config extends uvm_object;
     `uvm_field_int(no_csr_instr, UVM_DEFAULT)
     `uvm_field_int(no_ebreak, UVM_DEFAULT)
     `uvm_field_int(no_ecall, UVM_DEFAULT)
+    `uvm_field_int(no_syscall, UVM_DEFAULT)
+    `uvm_field_int(no_break, UVM_DEFAULT)
     `uvm_field_int(no_dret, UVM_DEFAULT)
     `uvm_field_int(no_fence, UVM_DEFAULT)
     `uvm_field_int(no_wfi, UVM_DEFAULT)
@@ -561,6 +566,8 @@ class riscv_instr_gen_config extends uvm_object;
     get_int_arg_value("+instr_cnt=", instr_cnt);
     get_bool_arg_value("+no_ebreak=", no_ebreak);
     get_bool_arg_value("+no_ecall=", no_ecall);
+    get_bool_arg_value("+no_syscall=", no_syscall);
+    get_bool_arg_value("+no_break=", no_break);
     get_bool_arg_value("+no_dret=", no_dret);
     get_bool_arg_value("+no_wfi=", no_wfi);
     get_bool_arg_value("+no_branch_jump=", no_branch_jump);

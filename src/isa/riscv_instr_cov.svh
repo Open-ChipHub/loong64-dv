@@ -99,7 +99,8 @@
     if (category == BRANCH) begin
       branch_hit = is_branch_hit();
     end
-    if (instr_name inside {DIV, DIVU, REM, REMU, DIVW, DIVUW, REMW, REMUW}) begin
+    if (instr_name inside {DIV, DIVU, REM, REMU, DIVW, DIVUW, REMW, REMUW,
+                           DIV_W, DIV_WU, DIV_D, DIV_DU, MOD_W, MOD_WU, MOD_D, MOD_DU}) begin
       div_result = get_div_result();
     end
   endfunction
@@ -113,11 +114,11 @@
   endfunction
 
   virtual function bit is_unaligned_mem_access();
-    if ((instr_name inside {LWU, LD, SD, C_LD, C_SD}) && (mem_addr % 8 != 0)) begin
+    if ((instr_name inside {LWU, LD, SD, C_LD, C_SD, LD_WU, LD_D, ST_D}) && (mem_addr % 8 != 0)) begin
       return 1'b1;
-    end else if ((instr_name inside {LW, SW, C_LW, C_SW}) && (mem_addr % 4 != 0)) begin
+    end else if ((instr_name inside {LW, SW, C_LW, C_SW, LD_W, ST_W}) && (mem_addr % 4 != 0)) begin
       return 1'b1;
-    end else if ((instr_name inside {LH, LHU, SH}) && (mem_addr % 2 != 0)) begin
+    end else if ((instr_name inside {LH, LHU, SH, LD_H, LD_HU, ST_H}) && (mem_addr % 2 != 0)) begin
       return 1'b1;
     end begin
       return 1'b0;
@@ -201,6 +202,9 @@
       BGE    : is_branch_hit = ($signed(rs1_value) >=  $signed(rs2_value));
       BLTU   : is_branch_hit = (rs1_value < rs2_value);
       BGEU   : is_branch_hit = (rs1_value >= rs2_value);
+      // LA64 branch instructions (same as RISC-V but keeping for clarity)
+      BEQZ   : is_branch_hit = (rs1_value == 0);
+      BNEZ   : is_branch_hit = (rs1_value != 0);
       default: `uvm_error(get_name(), $sformatf("Unexpected instr %0s", instr_name.name()))
     endcase
     return is_branch_hit;
@@ -435,3 +439,4 @@
       return 0;
     end
   endfunction : get_gpr_state
+

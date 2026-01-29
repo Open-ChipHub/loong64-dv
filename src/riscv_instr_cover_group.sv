@@ -913,6 +913,374 @@ class riscv_instr_cover_group;
   `FCLASS_INSTR_CG_BEGIN(fclass_d, D)
   `CG_END
 
+  ///////////// LA64 instruction functional coverage //////////////
+  
+  // LA64 Arithmetic instructions
+  `INSTR_CG_BEGIN(add_w)
+    cp_rs1         : coverpoint instr.rs1;
+    cp_rs2         : coverpoint instr.rs2;
+    cp_rd          : coverpoint instr.rd;
+    cp_rs1_sign    : coverpoint instr.rs1_sign;
+    cp_rs2_sign    : coverpoint instr.rs2_sign;
+    cp_rd_sign     : coverpoint instr.rd_sign;
+    `DV(cp_gpr_hazard : coverpoint instr.gpr_hazard;)
+    cp_sign_cross: cross cp_rs1_sign, cp_rs2_sign, cp_rd_sign;
+  `CG_END
+
+  `INSTR_CG_BEGIN(add_d)
+    cp_rs1         : coverpoint instr.rs1;
+    cp_rs2         : coverpoint instr.rs2;
+    cp_rd          : coverpoint instr.rd;
+    cp_rs1_sign    : coverpoint instr.rs1_sign;
+    cp_rs2_sign    : coverpoint instr.rs2_sign;
+    cp_rd_sign     : coverpoint instr.rd_sign;
+    `DV(cp_gpr_hazard : coverpoint instr.gpr_hazard;)
+    cp_sign_cross: cross cp_rs1_sign, cp_rs2_sign, cp_rd_sign;
+  `CG_END
+
+  `INSTR_CG_BEGIN(sub_w)
+    cp_rs1         : coverpoint instr.rs1;
+    cp_rs2         : coverpoint instr.rs2;
+    cp_rd          : coverpoint instr.rd;
+    cp_rs1_sign    : coverpoint instr.rs1_sign;
+    cp_rs2_sign    : coverpoint instr.rs2_sign;
+    cp_rd_sign     : coverpoint instr.rd_sign;
+    `DV(cp_gpr_hazard : coverpoint instr.gpr_hazard;)
+    cp_sign_cross: cross cp_rs1_sign, cp_rs2_sign, cp_rd_sign;
+  `CG_END
+
+  `INSTR_CG_BEGIN(sub_d)
+    cp_rs1         : coverpoint instr.rs1;
+    cp_rs2         : coverpoint instr.rs2;
+    cp_rd          : coverpoint instr.rd;
+    cp_rs1_sign    : coverpoint instr.rs1_sign;
+    cp_rs2_sign    : coverpoint instr.rs2_sign;
+    cp_rd_sign     : coverpoint instr.rd_sign;
+    `DV(cp_gpr_hazard : coverpoint instr.gpr_hazard;)
+    cp_sign_cross: cross cp_rs1_sign, cp_rs2_sign, cp_rd_sign;
+  `CG_END
+
+  `I_INSTR_CG_BEGIN(addi_w)
+    cp_sign_cross: cross cp_rs1_sign, cp_imm_sign, cp_rd_sign;
+  `CG_END
+
+  `I_INSTR_CG_BEGIN(addi_d)
+    cp_sign_cross: cross cp_rs1_sign, cp_imm_sign, cp_rd_sign;
+  `CG_END
+
+  `U_INSTR_CG_BEGIN(lu12i_w)
+  `CG_END
+
+  `U_INSTR_CG_BEGIN(lu32i_d)
+  `CG_END
+
+  `U_INSTR_CG_BEGIN(pcaddu12i)
+  `CG_END
+
+  `U_INSTR_CG_BEGIN(pcaddu18i)
+  `CG_END
+
+  `U_INSTR_CG_BEGIN(pcalau12i)
+  `CG_END
+
+  // LA64 Logical instructions
+  `R_INSTR_CG_BEGIN(and)
+    cp_logical   : coverpoint instr.logical_similarity;
+    cp_sign_cross: cross cp_rs1_sign, cp_rs2_sign;
+  `CG_END
+
+  `R_INSTR_CG_BEGIN(or)
+    cp_logical   : coverpoint instr.logical_similarity;
+    cp_sign_cross: cross cp_rs1_sign, cp_rs2_sign;
+  `CG_END
+
+  `R_INSTR_CG_BEGIN(nor)
+    cp_logical   : coverpoint instr.logical_similarity;
+    cp_sign_cross: cross cp_rs1_sign, cp_rs2_sign;
+  `CG_END
+
+  `R_INSTR_CG_BEGIN(xor)
+    cp_logical   : coverpoint instr.logical_similarity;
+    cp_sign_cross: cross cp_rs1_sign, cp_rs2_sign;
+  `CG_END
+
+  `R_INSTR_CG_BEGIN(andn)
+    cp_logical   : coverpoint instr.logical_similarity;
+    cp_sign_cross: cross cp_rs1_sign, cp_rs2_sign;
+  `CG_END
+
+  `R_INSTR_CG_BEGIN(orn)
+    cp_logical   : coverpoint instr.logical_similarity;
+    cp_sign_cross: cross cp_rs1_sign, cp_rs2_sign;
+  `CG_END
+
+  `I_INSTR_CG_BEGIN(andi)
+    cp_logical   : coverpoint instr.logical_similarity;
+    cp_sign_cross: cross cp_rs1_sign, cp_imm_sign;
+  `CG_END
+
+  `I_INSTR_CG_BEGIN(ori)
+    cp_logical   : coverpoint instr.logical_similarity;
+    cp_sign_cross: cross cp_rs1_sign, cp_imm_sign;
+  `CG_END
+
+  `I_INSTR_CG_BEGIN(xori)
+    cp_logical   : coverpoint instr.logical_similarity;
+    cp_sign_cross: cross cp_rs1_sign, cp_imm_sign;
+  `CG_END
+
+  // LA64 Multiplication and division instructions
+  `R_INSTR_CG_BEGIN(mul_w)
+    cp_sign_cross: cross cp_rs1_sign, cp_rs2_sign;
+  `CG_END
+
+  `R_INSTR_CG_BEGIN(mul_d)
+    cp_sign_cross: cross cp_rs1_sign, cp_rs2_sign;
+  `CG_END
+
+  `R_INSTR_CG_BEGIN(mulh_w)
+    cp_sign_cross: cross cp_rs1_sign, cp_rs2_sign;
+  `CG_END
+
+  `R_INSTR_CG_BEGIN(mulh_wu)
+    cp_sign_cross: cross cp_rs1_sign, cp_rs2_sign;
+  `CG_END
+
+  `R_INSTR_CG_BEGIN(mulh_d)
+    cp_sign_cross: cross cp_rs1_sign, cp_rs2_sign;
+  `CG_END
+
+  `R_INSTR_CG_BEGIN(mulh_du)
+    cp_sign_cross: cross cp_rs1_sign, cp_rs2_sign;
+  `CG_END
+
+  `R_INSTR_CG_BEGIN(div_w)
+    cp_div_result: coverpoint instr.div_result;
+    cp_sign_cross: cross cp_rs1_sign, cp_rs2_sign;
+  `CG_END
+
+  `R_INSTR_CG_BEGIN(div_wu)
+    cp_div_result: coverpoint instr.div_result {
+      ignore_bins no_overflow = {riscv_instr::DIV_OVERFLOW};
+    }
+    cp_sign_cross: cross cp_rs1_sign, cp_rs2_sign;
+  `CG_END
+
+  `R_INSTR_CG_BEGIN(div_d)
+    cp_div_result: coverpoint instr.div_result;
+    cp_sign_cross: cross cp_rs1_sign, cp_rs2_sign;
+  `CG_END
+
+  `R_INSTR_CG_BEGIN(div_du)
+    cp_div_result: coverpoint instr.div_result {
+      ignore_bins no_overflow = {riscv_instr::DIV_OVERFLOW};
+    }
+    cp_sign_cross: cross cp_rs1_sign, cp_rs2_sign;
+  `CG_END
+
+  `R_INSTR_CG_BEGIN(mod_w)
+    cp_div_result: coverpoint instr.div_result;
+    cp_sign_cross: cross cp_rs1_sign, cp_rs2_sign;
+  `CG_END
+
+  `R_INSTR_CG_BEGIN(mod_wu)
+    cp_div_result: coverpoint instr.div_result {
+      ignore_bins no_overflow = {riscv_instr::DIV_OVERFLOW};
+    }
+    cp_sign_cross: cross cp_rs1_sign, cp_rs2_sign;
+  `CG_END
+
+  `R_INSTR_CG_BEGIN(mod_d)
+    cp_div_result: coverpoint instr.div_result;
+    cp_sign_cross: cross cp_rs1_sign, cp_rs2_sign;
+  `CG_END
+
+  `R_INSTR_CG_BEGIN(mod_du)
+    cp_div_result: coverpoint instr.div_result {
+      ignore_bins no_overflow = {riscv_instr::DIV_OVERFLOW};
+    }
+    cp_sign_cross: cross cp_rs1_sign, cp_rs2_sign;
+  `CG_END
+
+  // LA64 Shift instructions
+  `R_INSTR_CG_BEGIN(sll_w)
+    cp_sign_cross: cross cp_rs1_sign, cp_rs2_sign;
+  `CG_END
+
+  `R_INSTR_CG_BEGIN(srl_w)
+    cp_sign_cross: cross cp_rs1_sign, cp_rs2_sign;
+  `CG_END
+
+  `R_INSTR_CG_BEGIN(sra_w)
+    cp_sign_cross: cross cp_rs1_sign, cp_rs2_sign;
+  `CG_END
+
+  `R_INSTR_CG_BEGIN(sll_d)
+    cp_sign_cross: cross cp_rs1_sign, cp_rs2_sign;
+  `CG_END
+
+  `R_INSTR_CG_BEGIN(srl_d)
+    cp_sign_cross: cross cp_rs1_sign, cp_rs2_sign;
+  `CG_END
+
+  `R_INSTR_CG_BEGIN(sra_d)
+    cp_sign_cross: cross cp_rs1_sign, cp_rs2_sign;
+  `CG_END
+
+  `INSTR_CG_BEGIN(slli_w)
+    cp_rs1         : coverpoint instr.rs1;
+    cp_rd          : coverpoint instr.rd;
+    cp_rs1_sign    : coverpoint instr.rs1_sign;
+    cp_rd_sign     : coverpoint instr.rd_sign;
+    `DV(cp_gpr_hazard  : coverpoint instr.gpr_hazard;)
+  `CG_END
+
+  `INSTR_CG_BEGIN(srli_w)
+    cp_rs1         : coverpoint instr.rs1;
+    cp_rd          : coverpoint instr.rd;
+    cp_rs1_sign    : coverpoint instr.rs1_sign;
+    cp_rd_sign     : coverpoint instr.rd_sign;
+    `DV(cp_gpr_hazard  : coverpoint instr.gpr_hazard;)
+  `CG_END
+
+  `INSTR_CG_BEGIN(srai_w)
+    cp_rs1         : coverpoint instr.rs1;
+    cp_rd          : coverpoint instr.rd;
+    cp_rs1_sign    : coverpoint instr.rs1_sign;
+    cp_rd_sign     : coverpoint instr.rd_sign;
+    `DV(cp_gpr_hazard  : coverpoint instr.gpr_hazard;)
+  `CG_END
+
+  `INSTR_CG_BEGIN(slli_d)
+    cp_rs1         : coverpoint instr.rs1;
+    cp_rd          : coverpoint instr.rd;
+    cp_rs1_sign    : coverpoint instr.rs1_sign;
+    cp_rd_sign     : coverpoint instr.rd_sign;
+    `DV(cp_gpr_hazard  : coverpoint instr.gpr_hazard;)
+  `CG_END
+
+  `INSTR_CG_BEGIN(srli_d)
+    cp_rs1         : coverpoint instr.rs1;
+    cp_rd          : coverpoint instr.rd;
+    cp_rs1_sign    : coverpoint instr.rs1_sign;
+    cp_rd_sign     : coverpoint instr.rd_sign;
+    `DV(cp_gpr_hazard  : coverpoint instr.gpr_hazard;)
+  `CG_END
+
+  `INSTR_CG_BEGIN(srai_d)
+    cp_rs1         : coverpoint instr.rs1;
+    cp_rd          : coverpoint instr.rd;
+    cp_rs1_sign    : coverpoint instr.rs1_sign;
+    cp_rd_sign     : coverpoint instr.rd_sign;
+    `DV(cp_gpr_hazard  : coverpoint instr.gpr_hazard;)
+  `CG_END
+
+  // LA64 Branch instructions
+  `SB_INSTR_CG_BEGIN(beq)
+  `CG_END
+
+  `SB_INSTR_CG_BEGIN(bne)
+  `CG_END
+
+  `SB_INSTR_CG_BEGIN(blt)
+  `CG_END
+
+  `SB_INSTR_CG_BEGIN(bge)
+  `CG_END
+
+  `SB_INSTR_CG_BEGIN(bltu)
+  `CG_END
+
+  `SB_INSTR_CG_BEGIN(bgeu)
+  `CG_END
+
+  // LA64 Load instructions
+  `LOAD_INSTR_CG_BEGIN(ld_b)
+  `CG_END
+
+  `LOAD_INSTR_CG_BEGIN(ld_bu)
+  `CG_END
+
+  `LOAD_INSTR_CG_BEGIN(ld_h)
+    cp_align: coverpoint instr.unaligned_mem_access;
+  `CG_END
+
+  `LOAD_INSTR_CG_BEGIN(ld_hu)
+    cp_align: coverpoint instr.unaligned_mem_access;
+  `CG_END
+
+  `LOAD_INSTR_CG_BEGIN(ld_w)
+    cp_align: coverpoint instr.unaligned_mem_access;
+  `CG_END
+
+  `LOAD_INSTR_CG_BEGIN(ld_wu)
+    cp_align: coverpoint instr.unaligned_mem_access;
+  `CG_END
+
+  `LOAD_INSTR_CG_BEGIN(ld_d)
+    cp_align: coverpoint instr.unaligned_mem_access;
+  `CG_END
+
+  // LA64 Store instructions
+  `STORE_INSTR_CG_BEGIN(st_b)
+  `CG_END
+
+  `STORE_INSTR_CG_BEGIN(st_h)
+    cp_misalign: coverpoint instr.unaligned_mem_access;
+  `CG_END
+
+  `STORE_INSTR_CG_BEGIN(st_w)
+    cp_misalign: coverpoint instr.unaligned_mem_access;
+  `CG_END
+
+  `STORE_INSTR_CG_BEGIN(st_d)
+    cp_misalign: coverpoint instr.unaligned_mem_access;
+  `CG_END
+
+  // LA64 Jump instructions
+  `J_INSTR_CG_BEGIN(b)
+  `CG_END
+
+  `J_INSTR_CG_BEGIN(bl)
+  `CG_END
+
+  `J_INSTR_CG_BEGIN(jirl)
+    cp_rs1_link : coverpoint instr.rs1 {
+      bins ra = {RA};
+      bins t1 = {T1};
+      bins non_link = default;
+    }
+    cp_rd_link : coverpoint instr.rd {
+      bins ra = {RA};
+      bins t1 = {T1};
+      bins non_link = default;
+    }
+    cp_ras : cross cp_rs1_link, cp_rd_link;
+  `CG_END
+
+  // LA64 Compare instructions
+  `CMP_INSTR_CG_BEGIN(slt)
+    cp_rs2        : coverpoint instr.rs2;
+    cp_rs2_sign   : coverpoint instr.rs2_sign;
+    cp_sign_cross : cross cp_rs1_sign, cp_rs2_sign;
+  `CG_END
+
+  `CMP_INSTR_CG_BEGIN(sltu)
+    cp_rs2        : coverpoint instr.rs2;
+    cp_rs2_sign   : coverpoint instr.rs2_sign;
+    cp_sign_cross : cross cp_rs1_sign, cp_rs2_sign;
+  `CG_END
+
+  `CMP_INSTR_CG_BEGIN(slti)
+    cp_imm_sign   : coverpoint instr.imm_sign;
+    cp_sign_cross : cross cp_rs1_sign, cp_imm_sign;
+  `CG_END
+
+  `CMP_INSTR_CG_BEGIN(sltui)
+    cp_imm_sign   : coverpoint instr.imm_sign;
+    cp_sign_cross : cross cp_rs1_sign, cp_imm_sign;
+  `CG_END
+
   // B extension instructions ratified in v.1.00 (Zba, Zbb, Zbc, Zbs).
   `ZBA_R_INSTR_CG_BEGIN(sh1add)
   `CG_END
@@ -2144,6 +2512,80 @@ class riscv_instr_cover_group;
       fsriw_cg        = new();
     `CG_SELECTOR_END
 
+    // LA64 instruction functional coverage instantiation
+    `CG_SELECTOR_BEGIN(LA64)
+      add_w_cg     = new();
+      add_d_cg     = new();
+      sub_w_cg     = new();
+      sub_d_cg     = new();
+      addi_w_cg    = new();
+      addi_d_cg    = new();
+      lu12i_w_cg   = new();
+      lu32i_d_cg   = new();
+      pcaddu12i_cg = new();
+      pcaddu18i_cg = new();
+      pcalau12i_cg = new();
+      and_cg       = new();
+      or_cg        = new();
+      nor_cg       = new();
+      xor_cg       = new();
+      andn_cg      = new();
+      orn_cg       = new();
+      andi_cg      = new();
+      ori_cg       = new();
+      xori_cg      = new();
+      mul_w_cg     = new();
+      mul_d_cg     = new();
+      mulh_w_cg    = new();
+      mulh_wu_cg   = new();
+      mulh_d_cg    = new();
+      mulh_du_cg   = new();
+      div_w_cg     = new();
+      div_wu_cg    = new();
+      div_d_cg     = new();
+      div_du_cg    = new();
+      mod_w_cg     = new();
+      mod_wu_cg    = new();
+      mod_d_cg     = new();
+      mod_du_cg    = new();
+      sll_w_cg     = new();
+      srl_w_cg     = new();
+      sra_w_cg     = new();
+      sll_d_cg     = new();
+      srl_d_cg     = new();
+      sra_d_cg     = new();
+      slli_w_cg    = new();
+      srli_w_cg    = new();
+      srai_w_cg    = new();
+      slli_d_cg    = new();
+      srli_d_cg    = new();
+      srai_d_cg    = new();
+      beq_cg       = new();
+      bne_cg       = new();
+      blt_cg       = new();
+      bge_cg       = new();
+      bltu_cg      = new();
+      bgeu_cg      = new();
+      ld_b_cg      = new();
+      ld_bu_cg     = new();
+      ld_h_cg      = new();
+      ld_hu_cg     = new();
+      ld_w_cg      = new();
+      ld_wu_cg     = new();
+      ld_d_cg      = new();
+      st_b_cg      = new();
+      st_h_cg      = new();
+      st_w_cg      = new();
+      st_d_cg      = new();
+      b_cg         = new();
+      bl_cg        = new();
+      jirl_cg      = new();
+      slt_cg       = new();
+      sltu_cg      = new();
+      slti_cg      = new();
+      sltui_cg     = new();
+    `CG_SELECTOR_END
+
     // Ignore the exception which cannot be covered when running with ISS
     if (iss_mode) begin
       int i;
@@ -2462,6 +2904,77 @@ class riscv_instr_cover_group;
       FSLW         : `SAMPLE_B(fslw_cg, instr)
       FSRW         : `SAMPLE_B(fsrw_cg, instr)
       FSRIW        : `SAMPLE_B(fsriw_cg, instr)
+      // LA64 instructions
+      ADD_W        : `SAMPLE(add_w_cg, instr)
+      ADD_D        : `SAMPLE(add_d_cg, instr)
+      SUB_W        : `SAMPLE(sub_w_cg, instr)
+      SUB_D        : `SAMPLE(sub_d_cg, instr)
+      ADDI_W       : `SAMPLE(addi_w_cg, instr)
+      ADDI_D       : `SAMPLE(addi_d_cg, instr)
+      LU12I_W      : `SAMPLE(lu12i_w_cg, instr)
+      LU32I_D      : `SAMPLE(lu32i_d_cg, instr)
+      PCADDU12I    : `SAMPLE(pcaddu12i_cg, instr)
+      PCADDU18I    : `SAMPLE(pcaddu18i_cg, instr)
+      PCALAU12I    : `SAMPLE(pcalau12i_cg, instr)
+      AND          : `SAMPLE(and_cg, instr)
+      OR           : `SAMPLE(or_cg, instr)
+      NOR          : `SAMPLE(nor_cg, instr)
+      XOR          : `SAMPLE(xor_cg, instr)
+      ANDN         : `SAMPLE(andn_cg, instr)
+      ORN          : `SAMPLE(orn_cg, instr)
+      ANDI         : `SAMPLE(andi_cg, instr)
+      ORI          : `SAMPLE(ori_cg, instr)
+      XORI         : `SAMPLE(xori_cg, instr)
+      MUL_W        : `SAMPLE(mul_w_cg, instr)
+      MUL_D        : `SAMPLE(mul_d_cg, instr)
+      MULH_W       : `SAMPLE(mulh_w_cg, instr)
+      MULH_WU      : `SAMPLE(mulh_wu_cg, instr)
+      MULH_D       : `SAMPLE(mulh_d_cg, instr)
+      MULH_DU      : `SAMPLE(mulh_du_cg, instr)
+      DIV_W        : `SAMPLE(div_w_cg, instr)
+      DIV_WU       : `SAMPLE(div_wu_cg, instr)
+      DIV_D        : `SAMPLE(div_d_cg, instr)
+      DIV_DU       : `SAMPLE(div_du_cg, instr)
+      MOD_W        : `SAMPLE(mod_w_cg, instr)
+      MOD_WU       : `SAMPLE(mod_wu_cg, instr)
+      MOD_D        : `SAMPLE(mod_d_cg, instr)
+      MOD_DU       : `SAMPLE(mod_du_cg, instr)
+      SLL_W        : `SAMPLE(sll_w_cg, instr)
+      SRL_W        : `SAMPLE(srl_w_cg, instr)
+      SRA_W        : `SAMPLE(sra_w_cg, instr)
+      SLL_D        : `SAMPLE(sll_d_cg, instr)
+      SRL_D        : `SAMPLE(srl_d_cg, instr)
+      SRA_D        : `SAMPLE(sra_d_cg, instr)
+      SLLI_W       : `SAMPLE(slli_w_cg, instr)
+      SRLI_W       : `SAMPLE(srli_w_cg, instr)
+      SRAI_W       : `SAMPLE(srai_w_cg, instr)
+      SLLI_D       : `SAMPLE(slli_d_cg, instr)
+      SRLI_D       : `SAMPLE(srli_d_cg, instr)
+      SRAI_D       : `SAMPLE(srai_d_cg, instr)
+      BEQ          : `SAMPLE(beq_cg, instr)
+      BNE          : `SAMPLE(bne_cg, instr)
+      BLT          : `SAMPLE(blt_cg, instr)
+      BGE          : `SAMPLE(bge_cg, instr)
+      BLTU         : `SAMPLE(bltu_cg, instr)
+      BGEU         : `SAMPLE(bgeu_cg, instr)
+      LD_B         : `SAMPLE(ld_b_cg, instr)
+      LD_BU        : `SAMPLE(ld_bu_cg, instr)
+      LD_H         : `SAMPLE(ld_h_cg, instr)
+      LD_HU        : `SAMPLE(ld_hu_cg, instr)
+      LD_W         : `SAMPLE(ld_w_cg, instr)
+      LD_WU        : `SAMPLE(ld_wu_cg, instr)
+      LD_D         : `SAMPLE(ld_d_cg, instr)
+      ST_B         : `SAMPLE(st_b_cg, instr)
+      ST_H         : `SAMPLE(st_h_cg, instr)
+      ST_W         : `SAMPLE(st_w_cg, instr)
+      ST_D         : `SAMPLE(st_d_cg, instr)
+      B            : `SAMPLE(b_cg, instr)
+      BL           : `SAMPLE(bl_cg, instr)
+      JIRL         : `SAMPLE(jirl_cg, instr)
+      SLT          : `SAMPLE(slt_cg, instr)
+      SLTU         : `SAMPLE(sltu_cg, instr)
+      SLTI         : `SAMPLE(slti_cg, instr)
+      SLTUI        : `SAMPLE(sltui_cg, instr)
       `VECTOR_INCLUDE("riscv_instr_cover_group_inc_cg_sample.sv")
       default: begin
         if (instr.group == RV32I) begin
@@ -2542,7 +3055,7 @@ class riscv_instr_cover_group;
           riscv_instr::instr_registry.exists(instr_name)) begin
         instr = riscv_instr::create_instr(instr_name);
         if ((instr.group inside {supported_isa}) &&
-            (instr.group inside {RV32I, RV32M, RV64M, RV64I, RV32C, RV64C,
+            (instr.group inside {LA64, RV32I, RV32M, RV64M, RV64I, RV32C, RV64C,
                                  RVV, RV64B, RV32B,
                                  RV32ZBA, RV32ZBB, RV32ZBC, RV32ZBS,
                                  RV64ZBA, RV64ZBB, RV64ZBC, RV64ZBS})) begin
@@ -2577,3 +3090,4 @@ class riscv_instr_cover_group;
   endfunction
 
 endclass
+

@@ -1,0 +1,10 @@
+- test: riscv_arithmetic_basic_test
+  description: >
+    Basic arithmetic instruction coverage for LA64
+    Covers: ADD.W/D, SUB.W/D, ADDI.W/D, MUL.W/D, DIV.W/D, MOD.W/D
+  iterations: 50
+  gen_opts: >
+    +instr_cnt=2000
+    +num_of_sub_program=0
+    +directed_instr_0=riscv_int_numeric_corner_stream,10
+  rtl_test: riscv_instr_cov_test

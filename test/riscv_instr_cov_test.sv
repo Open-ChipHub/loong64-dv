@@ -131,7 +131,7 @@ class riscv_instr_cov_test extends uvm_test;
       if (riscv_instr::instr_template.exists(instr_name)) begin
         riscv_instr instr;
         instr = riscv_instr::get_instr(instr_name);
-        if ((instr.group inside {RV32I, RV32M, RV32C, RV64I, RV64M, RV64C,
+        if ((instr.group inside {LA64, RV32I, RV32M, RV32C, RV64I, RV64M, RV64C,
                                  RV32F, RV64F, RV32D, RV64D, RV32B, RV64B,
                                  RV32ZBA, RV32ZBB, RV32ZBC, RV32ZBS,
                                  RV64ZBA, RV64ZBB, RV64ZBC, RV64ZBS}) &&

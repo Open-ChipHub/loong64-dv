@@ -98,3 +98,35 @@
     +boot_mode=m
   iterations: 5
   rtl_test: core_base_test
+
+# LA64 特权模式切换测试
+- test: la64_privileged_mode_test
+  description: >
+    Test LoongArch privileged mode switching (PLV0/Machine Mode)
+    This test generates code that switches to machine mode using CRMD/PRMD/ECFG/ERTN
+  gen_test: riscv_instr_base_test
+  gen_opts: >
+    +instr_cnt=5000
+    +bare_program_mode=0          # 启用特权模式切换（关键参数）
+    +boot_mode=m                  # 启动模式：m=机器模式(PLV0), s=监督模式(PLV2), u=用户模式(PLV3)
+    +enable_interrupt=1           # 使能中断
+    +enable_timer_irq=1           # 使能定时器中断
+    +num_of_sub_program=3
+    +sub_program_instr_cnt=1000
+  iterations: 3
+  rtl_test: core_base_test
+
+# LA64 syscall/break trap test for dynamic privilege switching
+- test: la64_syscall_brk_trap_test
+  description: >
+    Tests dynamic privilege switching via syscall/break traps.
+    Starts in user mode (PLV3), traps to the PLV0 handler, and returns to PLV3.
+  gen_test: riscv_instr_base_test
+  gen_opts: >
+    +instr_cnt=2000
+    +bare_program_mode=0          # Enable trap handler generation
+    +boot_mode=u                  # Start in User Mode (PLV3)
+    +no_syscall=0                 # Enable syscall instruction
+    +no_break=0                   # Enable break instruction
+  iterations: 1
+  rtl_test: core_base_test

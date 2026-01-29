@@ -481,6 +481,8 @@ package riscv_instr_pkg;
 	ERTN,
 	DBCL,
 	IDLE,
+	SYSCALL,
+	BREAK,
     // Custom instructions
     `include "isa/custom/riscv_custom_instr_enum.sv"
     // You can add other instructions here
@@ -1119,6 +1121,7 @@ package riscv_instr_pkg;
   // `include "riscv_page_table.sv"
   // `include "riscv_page_table_list.sv"
   // `include "riscv_privileged_common_seq.sv"
+  `include "la64_privileged_common_seq.sv"
   `include "riscv_callstack_gen.sv"   // 生成带“子程序/函数调用”的测试，如果只产生线性指令流不需要
   `include "riscv_data_page_gen.sv"   // 生成可直接拼到汇编里的数据节(.section)字符串，为加载/存储/AMO/权限相关用例提供可控的内存初始内容与分段布局，覆盖对齐、边界与不同访问权限场景。
 
