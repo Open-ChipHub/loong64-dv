@@ -261,6 +261,13 @@ class riscv_rand_instr_stream extends riscv_instr_stream;
     //     exclude_instr = {exclude_instr, EBREAK, C_EBREAK};
     //   end
     // end
+	// LA64: optionally exclude syscall/break
+    if (cfg.no_syscall) begin
+      exclude_instr = {exclude_instr, SYSCALL};
+    end
+    if (cfg.no_break) begin
+      exclude_instr = {exclude_instr, BREAK};
+    end
     instr = riscv_instr::get_rand_instr(.include_instr(allowed_instr),
                                          .exclude_instr(exclude_instr),
                                         .include_group(include_group));

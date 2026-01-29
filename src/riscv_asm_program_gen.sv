@@ -44,7 +44,7 @@ class riscv_asm_program_gen extends uvm_object;
    riscv_instr_stream                  directed_instr[];
    string                              instr_stream[$];
    riscv_callstack_gen                 callstack_gen;
-   // riscv_privileged_common_seq         privil_seq;
+   la64_privileged_common_seq          la64_privil_seq;
    // Directed instruction ratio, occurance per 1000 instructions
    int unsigned                        directed_instr_stream_ratio[string];
    // riscv_page_table_list#(SATP_MODE)   page_table_list;
@@ -80,13 +80,19 @@ class riscv_asm_program_gen extends uvm_object;
     for (int hart = 0; hart < cfg.num_of_harts; hart++) begin
       string sub_program_name[$];
       instr_stream.push_back($sformatf("h%0d_start:", hart));
-      // if (!cfg.bare_program_mode) begin
-      //   setup_misa();
-      //   // Create all page tables
-      //   create_page_table(hart);
-      //   // Setup privileged mode registers and enter target privileged mode
-      //   pre_enter_privileged_mode(hart);
-      // end
+      if (!cfg.bare_program_mode) begin
+        // setup_misa();  // LA64 doesn't have MISA
+        // Create all page tables
+        // create_page_table(hart);  // Commented for now, can be enabled if needed
+        // Setup privileged mode registers and enter target privileged mode
+        pre_enter_privileged_mode(hart);
+      end
+      // Setup LA64 trap handler (syscall/break) and EENTRY before running user code
+      if (!cfg.bare_program_mode) begin
+        setup_trap_vector(hart);
+      end
+      // Label right after privileged-mode ERTN returns
+      instr_stream.push_back(get_label("post_ertn:", hart));
       // Init section
       gen_init_section(hart);
       // If PMP is supported, we want to generate the associated trap handlers and the test_done
@@ -144,6 +150,12 @@ class riscv_asm_program_gen extends uvm_object;
       insert_sub_program(sub_program[hart], instr_stream);
       `uvm_info(`gfn, "Inserting sub-programs...done", UVM_LOW)
       `uvm_info(`gfn, "Main/sub program generation...done", UVM_LOW)
+
+      // Generate LA64 trap handler code after all normal code, to avoid shifting post_ertn address
+      if (!cfg.bare_program_mode) begin
+        gen_trap_handler(hart);
+      end
+
       // Program end
       // gen_program_end(hart);
       // if (!cfg.bare_program_mode) begin
@@ -757,98 +769,97 @@ class riscv_asm_program_gen extends uvm_object;
   // endfunction
 
   //---------------------------------------------------------------------------------------
+  // LA64 syscall/break trap support (minimal, RISC-V style)
+  //---------------------------------------------------------------------------------------
+
+  // Set EENTRY to trap handler entry (LA64's trap vector)
+  virtual function void setup_trap_vector(int hart);
+    string instr[$];
+    // EENTRY.VPN holds base[XLEN-1:12]
+    instr.push_back($sformatf("la $r%0d, %0s", cfg.gpr[0], get_label("trap_entry", hart)));
+    // Align to 4K as required by EENTRY format (low 12 bits are zero)
+    instr.push_back($sformatf("srli.d $r%0d, $r%0d, 12", cfg.gpr[0], cfg.gpr[0]));
+    instr.push_back($sformatf("csrwr $r%0d, 0x%0x # eentry", cfg.gpr[0], EENTRY));
+    gen_section(get_label("eentry_setup", hart), instr);
+  endfunction
+
+  // Minimal trap handler for LA64: handle SYS/BRK and return to PLV3
+  virtual function void gen_trap_handler(int hart);
+    string instr[$];
+    // Entry label
+    instr.push_back(get_label("trap_entry:", hart));
+    // Read ESTAT
+    instr.push_back({indent, $sformatf("csrrd $r%0d, 0x%0x # estat", cfg.gpr[0], ESTAT)});
+    // Extract Ecode: based on la64_privil_reg.sv, Ecode starts at bit 16 and is 6-bit
+    instr.push_back({indent, $sformatf("srli.d $r%0d, $r%0d, 16", cfg.gpr[0], cfg.gpr[0])});
+    instr.push_back({indent, $sformatf("andi $r%0d, $r%0d, 0x3f", cfg.gpr[0], cfg.gpr[0])});
+    // If not SYS(0) and not BRK(1), loop
+    instr.push_back({indent, $sformatf("beqz $r%0d, %0s", cfg.gpr[0], get_label("trap_ret", hart))});
+    instr.push_back({indent, $sformatf("addi.d $r%0d, $r%0d, -1", cfg.gpr[0], cfg.gpr[0])});
+    instr.push_back({indent, $sformatf("beqz $r%0d, %0s", cfg.gpr[0], get_label("trap_ret", hart))});
+    instr.push_back({indent, $sformatf("b %0s", get_label("trap_hang", hart))});
+
+    // Return path
+    instr.push_back(get_label("trap_ret:", hart));
+    // RISC-V style: epc += 4 then xRET. Here: ERA += 4 then ERTN.
+    // Some ISS may not populate ERA correctly for syscall/break yet; add a fallback.
+    instr.push_back({indent, $sformatf("csrrd $r%0d, 0x%0x # era", cfg.gpr[1], ERA)});
+    // If ERA == 0, fall back to post_ertn/main to avoid jumping to 0x0
+    instr.push_back({indent, $sformatf("bnez $r%0d, %0s", cfg.gpr[1], get_label("trap_ret_fixup", hart))});
+    instr.push_back({indent, $sformatf("la $r%0d, %0s", cfg.gpr[1], get_label("post_ertn", hart))});
+    instr.push_back(get_label("trap_ret_fixup:", hart));
+    instr.push_back({indent, $sformatf("addi.d $r%0d, $r%0d, 4", cfg.gpr[1], cfg.gpr[1])});
+    instr.push_back({indent, $sformatf("csrwr $r%0d, 0x%0x # era", cfg.gpr[1], ERA)});
+    // Set PRMD.PPLV=3 (PLV3) and PRMD.PIE=1
+    // PRMD layout in la64_privil_reg.sv: PPLV[1:0], PIE[2], PWE[3]
+    instr.push_back({indent, $sformatf("li.w $r%0d, 0x7", cfg.gpr[0])});
+    instr.push_back({indent, $sformatf("csrwr $r%0d, 0x%0x # prmd (pplv=3,pie=1)", cfg.gpr[0], PRMD)});
+    // Return
+    instr.push_back({indent, "ertn"});
+
+    // Trap hang loop
+    instr.push_back(get_label("trap_hang:", hart));
+    instr.push_back({indent, $sformatf("b %0s", get_label("trap_hang", hart))});
+
+    // Put in text section
+    gen_section(get_label("trap_handler", hart), instr);
+  endfunction
+
+  //---------------------------------------------------------------------------------------
   // Privileged mode entering routine
   //---------------------------------------------------------------------------------------
 
-  // virtual function void pre_enter_privileged_mode(int hart);
-  //   string instr[];
-  //   string str[$];
-  //   // Setup kerenal stack pointer
-  //   str = {$sformatf("la x%0d, %0skernel_stack_end", cfg.tp, hart_prefix(hart))};
-  //   gen_section(get_label("kernel_sp", hart), str);
-  //   // Setup interrupt and exception delegation
-  //   if(!cfg.no_delegation && (cfg.init_privileged_mode != MACHINE_MODE)) begin
-  //     gen_delegation(hart);
-  //   end
-  //   // Setup trap vector register
-  //   trap_vector_init(hart);
-  //   // Setup PMP CSRs
-  //   setup_pmp(hart);
-  //   // Generate PMPADDR write test sequence
-  //   gen_pmp_csr_write(hart);
-  //   // Initialize PTE (link page table based on their real physical address)
-  //   if(cfg.virtual_addr_translation_on) begin
-  //     page_table_list.process_page_table(instr);
-  //     gen_section(get_label("process_pt", hart), instr);
-  //   end
-  //   // Setup mepc register, jump to init entry
-  //   setup_epc(hart);
-  //   // Initialization of any implementation-specific custom CSRs
-  //   setup_custom_csrs(hart);
-  //   // Setup initial privilege mode
-  //   gen_privileged_mode_switch_routine(hart);
-  // endfunction
+  // LA64 privileged mode entering routine
+  virtual function void pre_enter_privileged_mode(int hart);
+    // For LA64 we only setup ERA and privileged CSRs, then use ERTN to enter target PLV
+    setup_epc(hart);
+    gen_privileged_mode_switch_routine(hart);
+  endfunction
 
-  // virtual function void gen_privileged_mode_switch_routine(int hart);
-  //   privil_seq = riscv_privileged_common_seq::type_id::create("privil_seq");
-  //   foreach(riscv_instr_pkg::supported_privileged_mode[i]) begin
-  //     string instr[$];
-  //     string csr_handshake[$];
-  //     string ret_instr;
-  //     if(riscv_instr_pkg::supported_privileged_mode[i] != cfg.init_privileged_mode) continue;
-  //     `uvm_info(`gfn, $sformatf("Generating privileged mode routing for %0s",
-  //                     riscv_instr_pkg::supported_privileged_mode[i].name()), UVM_LOW)
-  //     // Enter privileged mode
-  //     privil_seq.cfg = cfg;
-  //     privil_seq.hart = hart;
-  //     `DV_CHECK_RANDOMIZE_FATAL(privil_seq)
-  //     privil_seq.enter_privileged_mode(riscv_instr_pkg::supported_privileged_mode[i], instr);
-  //     if (cfg.require_signature_addr) begin
-  //       ret_instr = instr.pop_back();
-  //       // Want to write the main system CSRs to the testbench before indicating that initialization
-  //       // is complete, for any initial state analysis
-  //       case(riscv_instr_pkg::supported_privileged_mode[i])
-  //         SUPERVISOR_MODE: begin
-  //           gen_signature_handshake(.instr(csr_handshake), .signature_type(WRITE_CSR),
-  //                                   .csr(SSTATUS));
-  //           gen_signature_handshake(.instr(csr_handshake), .signature_type(WRITE_CSR),
-  //                                   .csr(SIE));
-  //         end
-  //         USER_MODE: begin
-  //           gen_signature_handshake(.instr(csr_handshake), .signature_type(WRITE_CSR),
-  //                                   .csr(USTATUS));
-  //           gen_signature_handshake(.instr(csr_handshake), .signature_type(WRITE_CSR), .csr(UIE));
-  //         end
-  //         default: `uvm_info(`gfn, $sformatf("Unsupported privileged_mode %0s",
-  //                                  riscv_instr_pkg::supported_privileged_mode[i]), UVM_LOW)
-  //       endcase
-  //       // Write M-mode CSRs to testbench by default, as these should be implemented
-  //       gen_signature_handshake(.instr(csr_handshake), .signature_type(WRITE_CSR), .csr(MSTATUS));
-  //       gen_signature_handshake(.instr(csr_handshake), .signature_type(WRITE_CSR), .csr(MIE));
-  //       format_section(csr_handshake);
-  //       instr = {instr, csr_handshake, ret_instr};
-  //     end
-  //     instr_stream = {instr_stream, instr};
-  //   end
-  // endfunction
+  // LA64 privileged mode switch routine (LoongArch only)
+  virtual function void gen_privileged_mode_switch_routine(int hart);
+    la64_privil_seq = la64_privileged_common_seq::type_id::create("la64_privil_seq");
+    foreach(riscv_instr_pkg::supported_privileged_mode[i]) begin
+      string instr[$];
+      string ret_instr;
+      if(riscv_instr_pkg::supported_privileged_mode[i] != cfg.init_privileged_mode) continue;
+      `uvm_info(`gfn, $sformatf("Generating LoongArch privileged mode routing for %0s",
+                      riscv_instr_pkg::supported_privileged_mode[i].name()), UVM_LOW)
+      la64_privil_seq.cfg = cfg;
+      la64_privil_seq.hart = hart;
+      `DV_CHECK_RANDOMIZE_FATAL(la64_privil_seq)
+      la64_privil_seq.enter_privileged_mode(riscv_instr_pkg::supported_privileged_mode[i], instr);
+      instr_stream = {instr_stream, instr};
+    end
+  endfunction
 
-  // Setup EPC before entering target privileged mode
-  // virtual function void setup_epc(int hart);
-  //   string instr[$];
-  //   string mode_name;
-  //   instr = {$sformatf("la x%0d, %0sinit", cfg.gpr[0], hart_prefix(hart))};
-  //   if(cfg.virtual_addr_translation_on) begin
-  //     // For supervisor and user mode, use virtual address instead of physical address.
-  //     // Virtual address starts from address 0x0, here only the lower 12 bits are kept
-  //     // as virtual address offset.
-  //     instr = {instr,
-  //              $sformatf("slli x%0d, x%0d, %0d", cfg.gpr[0], cfg.gpr[0], XLEN - 12),
-  //              $sformatf("srli x%0d, x%0d, %0d", cfg.gpr[0], cfg.gpr[0], XLEN - 12)};
-  //   end
-  //   mode_name = cfg.init_privileged_mode.name();
-  //   instr.push_back($sformatf("csrw 0x%0x, x%0d", MEPC, cfg.gpr[0]));
-  //   gen_section(get_label("mepc_setup", hart), instr);
-  // endfunction
+  // Setup EPC/ERA before entering target privileged mode
+  virtual function void setup_epc(int hart);
+    string instr[$];
+    instr.push_back($sformatf("la $r%0d, %0s", cfg.gpr[0], get_label("post_ertn", hart)));
+    instr.push_back($sformatf("csrwr $r%0d, 0x%0x # era", cfg.gpr[0], ERA));
+    gen_section(get_label("era_setup", hart), instr);
+  endfunction
 
   // Setup PMP CSR configuration
   // virtual function void setup_pmp(int hart);

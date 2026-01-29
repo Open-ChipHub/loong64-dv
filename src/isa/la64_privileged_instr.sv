@@ -93,6 +93,14 @@ class la64_privileged_instr extends riscv_instr;
         has_rd  = 1'b0;  
         has_imm = 1'b0;
       end
+
+      // 2.2.10 系统调用/断点指令
+      SYSCALL, BREAK: begin
+        has_rs1 = 1'b0;
+        has_rs2 = 1'b0;
+        has_rd  = 1'b0;
+        has_imm = 1'b1;  // code immediate
+      end
       
       DBCL: begin
         has_rs1 = 1'b0;  // Only immediate in assembly: dbcl hint
@@ -163,6 +171,12 @@ class la64_privileged_instr extends riscv_instr;
       ERTN: begin
         // No operands
       end
+
+      // 2.2.10 系统调用/断点指令
+      SYSCALL, BREAK: begin
+        // 固定 code=0（默认值），避免对编码字段位宽/汇编器语法产生歧义
+        asm_str = $sformatf("%0s0x0", asm_str);
+      end
       
       DBCL: begin
         asm_str = $sformatf("%0s0x%0x", asm_str, hint);
@@ -207,6 +221,8 @@ class la64_privileged_instr extends riscv_instr;
       ERTN:        return "ertn";
       DBCL:        return "dbcl";
       IDLE:        return "idle";
+      SYSCALL:     return "syscall";
+      BREAK:       return "break";
       default:     return super.get_instr_name();
     endcase
   endfunction

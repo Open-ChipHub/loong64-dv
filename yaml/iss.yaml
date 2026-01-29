@@ -45,7 +45,7 @@
 - iss: la_emu_kernel
   path_var: LA_EMU_PATH
   cmd: >
-    <path_var>/la_emu_kernel -d exec -k <elf>
+    <path_var>/la_emu_kernel -d exec,cpu -k <elf>
 
 - iss: la_emu_user
   path_var: LA_EMU_PATH
